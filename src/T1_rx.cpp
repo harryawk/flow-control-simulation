@@ -1,10 +1,11 @@
 /*
  * File : T1_rx.cpp
  */
-
 #include "dcomm.h"
 #include <stdlib.h>
 #include <stddef.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <iostream>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -22,6 +23,7 @@
 #define RXQSIZE 8
 
 Byte rxbuf[RXQSIZE];
+char clientName[1000];
 QTYPE rcvq = { 0, 0, 0, RXQSIZE, rxbuf };
 QTYPE *rxq = &rcvq;
 Byte sent_xonxoff = XON;
@@ -34,10 +36,13 @@ int sockfd; //listen on sock_fd
 static Byte *rcvchar(int sockfd, QTYPE *queue);
 static Byte *q_get(QTYPE *, Byte *);
 
+
+struct sockaddr_in serv_addr;
+socklen_t addrlen = sizeof(serv_addr);
+
 // SERVER PROGRAM
 int main(int argc, char *argv[]){
 	Byte c;
-	
 	/*
 	 * Insert code here to bind socket to the port number given in argv[1]
 	 */	
@@ -45,49 +50,63 @@ int main(int argc, char *argv[]){
 	int serversock = socket(AF_INET, SOCK_DGRAM, 0);
 
 	// initialize server address
-	struct sockaddr_in serv_addr;
+	
 
    	serv_addr.sin_family = AF_INET;
-   	serv_addr.sin_addr.s_addr = INADDR_ANY;
+   	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
    	if (argc > 1) {
-   		serv_addr.sin_port = atoi(argv[1]);
+   		serv_addr.sin_port = htons(atoi(argv[1]));
    	} else {
-   		serv_addr.sin_port = 21000;
+   		serv_addr.sin_port = htons(21000);
    	}
-   	bzero((char *) &serv_addr, sizeof(serv_addr));
+   	//bzero((char *) &serv_addr, sizeof(serv_addr));
 
    	if (bind(serversock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
    		perror("ERROR : on binding");
    		exit(1);
-   	} // if get out of here : serversock binded
+   	} 
+   	// if get out of here : serversock binded
+	inet_ntop(AF_INET, &serv_addr.sin_addr, clientName, sizeof (clientName));
+	printf("Binding pada %s:%d\n", clientName, ntohs(serv_addr.sin_port));
 	
 	/* Initialize XON/XOFF flags */
+	send_xon = false;
+	send_xoff = false;
+	
+	/////////// GET HERE /////////////////////
 
-   	/////////// GET HERE /////////////////////
-	
 	/* Create child process */
-	// pid_t pid = fork();
-	
-	// /*** IF PARENT PROCESS ***/
-	// if (pid > 0) {
-	// 	while(true){
-	// 		c = *(rcvchar(sockfd, rxq));
+	pid_t pid = fork();
+	/*** IF PARENT PROCESS ***/
+	if (pid > 0) {
+		while(true){
+			c = *(rcvchar(sockfd, rxq));	
+			/* Quit on end of file */
+			if (c == Endfile){
+				exit(0);
+			}
+		}
+	} 
+	/*** ELSE IF CHILD PROCESS ***/
+	else if (pid == 0) {
+		while(true){
 			
-	// 		/* Quit on end of file */
-	// 		if (c == Endfile){
-	// 			exit(0);
-	// 		}
-	// 	}
-	// } else if (pid == 0) {
-	// /*** ELSE IF CHILD PROCESS ***/
-	// 	while(true){
-	// 		/* Call q_get */
-	// 		/* Can introduce some delay here. */
-	// 	}
-	// }
+			break;
+	 		/* Call q_get */
+	 		/* Can introduce some delay here. */
+	 	}
+	}
+	return 0;
 }
 
 static Byte *rcvchar(int sockfd, QTYPE *queue){
+	
+	//gayakin sama ini plis
+	char *c;
+	recvfrom(sockfd, c, sizeof(c), 0, (struct sockaddr*)&serv_addr , &addrlen);
+	queue->count++;
+	queue->data[queue->rear] = *c;
+	queue->rear++;
 	/*
 	 * Insert code here.
 	 * Read a character from socket and put it to the receive buffer.
@@ -95,7 +114,7 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 	 * certain level, then send XOFF and set a flag (why?).
 	 * Return a pointer to the buffer where data is put.
 	 */
-
+	return queue->data; 
 }
 
 /* q_get returns a pointer to the buffer where data is read 
@@ -105,6 +124,7 @@ static Byte *q_get(QTYPE *queue, Byte *data){
 	Byte *current;
 	/* Nothing in the queue */
 	if(!queue->count) return (NULL);
+		
 	/*
 	 * Insert code here.
 	 * Retrieve data from buffer, save it to "current" and "data"
@@ -112,5 +132,4 @@ static Byte *q_get(QTYPE *queue, Byte *data){
 	 * certain level, then send XON.
 	 * Increment front index and check for wraparound.
 	 */
-
 }
