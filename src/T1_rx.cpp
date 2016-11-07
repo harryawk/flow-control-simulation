@@ -36,7 +36,6 @@ int sockfd; //listen on sock_fd
 static Byte *rcvchar(int sockfd, QTYPE *queue);
 static Byte *q_get(QTYPE *);
 
-
 struct sockaddr_in serv_addr;
 socklen_t addrlen = sizeof(serv_addr);
 
@@ -45,12 +44,12 @@ int main(int argc, char *argv[]){
 	Byte c;
 	/*
 	 * Insert code here to bind socket to the port number given in argv[1]
-	 */	
+	 */
 	// create socket
 	int serversock = socket(AF_INET, SOCK_DGRAM, 0);
 
 	// initialize server address
-	
+
 
    	serv_addr.sin_family = AF_INET;
    	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
@@ -64,15 +63,15 @@ int main(int argc, char *argv[]){
    	if (bind(serversock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
    		perror("ERROR : on binding");
    		exit(1);
-   	} 
+   	}
    	// if get out of here : serversock binded
 	inet_ntop(AF_INET, &serv_addr.sin_addr, clientName, sizeof (clientName));
 	printf("Binding pada %s:%d\n", clientName, ntohs(serv_addr.sin_port));
-	
+
 	/* Initialize XON/XOFF flags */
 	send_xon = false;
 	send_xoff = false;
-	
+
 	/////////// GET HERE /////////////////////
 
 	/* Create child process */
@@ -80,17 +79,17 @@ int main(int argc, char *argv[]){
 	/*** IF PARENT PROCESS ***/
 	if (pid > 0) {
 		while(true){
-			c = *(rcvchar(sockfd, rxq));	
+			c = *(rcvchar(sockfd, rxq));
 			/* Quit on end of file */
 			if (c == Endfile){
 				exit(0);
 			}
 		}
-	} 
+	}
 	/*** ELSE IF CHILD PROCESS ***/
 	else if (pid == 0) {
 		while(true){
-			
+
 			break;
 	 		/* Call q_get */
 	 		/* Can introduce some delay here. */
@@ -100,12 +99,12 @@ int main(int argc, char *argv[]){
 }
 
 static Byte *rcvchar(int sockfd, QTYPE *queue){
-	
+
 	//gayakin sama ini plis
 	char c[10];
 	recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&serv_addr , &addrlen);
 	queue->count++;
-	queue->data[queue->rear] = c[0];
+	queue->data[queue->rear] = *c;
 	queue->rear++;
 	/*
 	 * Insert code here.
@@ -114,17 +113,17 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 	 * certain level, then send XOFF and set a flag (why?).
 	 * Return a pointer to the buffer where data is put.
 	 */
-	return queue->data; 
+	return queue->data;
 }
 
-/* q_get returns a pointer to the buffer where data is read 
+/* q_get returns a pointer to the buffer where data is read
  * or NULL if buffer is empty/
  */
 static Byte *q_get(QTYPE *queue){
 	Byte *current;
 	/* Nothing in the queue */
 	if(!queue->count) return (NULL);
-		
+
 	/*
 	 * Insert code here.
 	 * Retrieve data from buffer, save it to "current" and "data"
@@ -132,4 +131,5 @@ static Byte *q_get(QTYPE *queue){
 	 * certain level, then send XON.
 	 * Increment front index and check for wraparound.
 	 */
+	 return current;
 }
