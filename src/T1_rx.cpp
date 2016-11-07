@@ -42,7 +42,11 @@ struct sockaddr_in serv_addr;
 socklen_t addrlen = sizeof(serv_addr);
 
 void *childProcess(void *threadid){
-
+	while(true){
+		break;
+		/* Call q_get */
+		/* Can introduce some delay here. */
+	}
 	pthread_exit(NULL);
 }
 
@@ -90,28 +94,14 @@ int main(int argc, char *argv[]){
         exit(-1);
 	}
 	/*** IF PARENT PROCESS ***/
-
-
-	/*
-	if (pid > 0) {
-		while(true){
-			c = *(rcvchar(sockfd, rxq));
-			// Quit on end of file
-			if (c == Endfile){
-				exit(0);
-			}
+	while(true){
+		c = *(rcvchar(sockfd, rxq));
+		// Quit on end of file
+		if(c == Endfile){
+			exit(0);
 		}
 	}
-	*/
-	/*** ELSE IF CHILD PROCESS ***/
-	/*else if (pid == 0) {
-		while(true){
-
-			break;
-	 		/* Call q_get */
-	 		/* Can introduce some delay here. */
-/*	 	}
-	}*/
+	/*** ELSE IF CHILD PROCESS ***/ // udah ditaro diatas
 
 	pthread_exit(NULL);
 	return 0;
