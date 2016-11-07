@@ -34,7 +34,7 @@ int sockfd; //listen on sock_fd
 
 /* Functions declaration */
 static Byte *rcvchar(int sockfd, QTYPE *queue);
-static Byte *q_get(QTYPE *, Byte *);
+static void *q_get(QTYPE *, Byte *);
 
 
 struct sockaddr_in serv_addr;
@@ -53,11 +53,11 @@ int main(int argc, char *argv[]){
 	
 
    	serv_addr.sin_family = AF_INET;
-   	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+   	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
    	if (argc > 1) {
-   		serv_addr.sin_port = htons(atoi(argv[1]));
+   		serv_addr.sin_port = htons(atoi(argv[2]));
    	} else {
-   		serv_addr.sin_port = htons(21000);
+   		serv_addr.sin_port = htons(13514);
    	}
    	//bzero((char *) &serv_addr, sizeof(serv_addr));
 
@@ -102,10 +102,10 @@ int main(int argc, char *argv[]){
 static Byte *rcvchar(int sockfd, QTYPE *queue){
 	
 	//gayakin sama ini plis
-	char *c;
+	char c[10];
 	recvfrom(sockfd, c, sizeof(c), 0, (struct sockaddr*)&serv_addr , &addrlen);
 	queue->count++;
-	queue->data[queue->rear] = *c;
+	queue->data[queue->rear] = c[0];
 	queue->rear++;
 	/*
 	 * Insert code here.
@@ -120,7 +120,7 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 /* q_get returns a pointer to the buffer where data is read 
  * or NULL if buffer is empty/
  */
-static Byte *q_get(QTYPE *queue, Byte *data){
+static void *q_get(QTYPE *queue, Byte *data){
 	Byte *current;
 	/* Nothing in the queue */
 	if(!queue->count) return (NULL);
