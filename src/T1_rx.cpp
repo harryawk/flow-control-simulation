@@ -34,7 +34,7 @@ int sockfd; //listen on sock_fd
 
 /* Functions declaration */
 static Byte *rcvchar(int sockfd, QTYPE *queue);
-static void *q_get(QTYPE *, Byte *);
+static Byte *q_get(QTYPE *);
 
 
 struct sockaddr_in serv_addr;
@@ -103,7 +103,7 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 	
 	//gayakin sama ini plis
 	char c[10];
-	recvfrom(sockfd, c, sizeof(c), 0, (struct sockaddr*)&serv_addr , &addrlen);
+	recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&serv_addr , &addrlen);
 	queue->count++;
 	queue->data[queue->rear] = c[0];
 	queue->rear++;
@@ -120,7 +120,7 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 /* q_get returns a pointer to the buffer where data is read 
  * or NULL if buffer is empty/
  */
-static void *q_get(QTYPE *queue, Byte *data){
+static Byte *q_get(QTYPE *queue){
 	Byte *current;
 	/* Nothing in the queue */
 	if(!queue->count) return (NULL);
