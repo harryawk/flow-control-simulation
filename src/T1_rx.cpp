@@ -15,6 +15,8 @@
 #include <netinet/in.h>
 #include <limits.h>
 #include <stdio.h>
+#include <pthread.h>
+
 // #include <stderr.h>
 /* Delay to adjust speed of consuming buffer, in milliseconds */
 #define DELAY 500
@@ -38,6 +40,11 @@ static Byte *q_get(QTYPE *);
 
 struct sockaddr_in serv_addr;
 socklen_t addrlen = sizeof(serv_addr);
+
+void *childProcess(void *threadid){
+
+	pthread_exit(NULL);
+}
 
 // SERVER PROGRAM
 int main(int argc, char *argv[]){
@@ -75,26 +82,38 @@ int main(int argc, char *argv[]){
 	/////////// GET HERE /////////////////////
 
 	/* Create child process */
-	pid_t pid = fork();
+	/*pid_t pid = fork(); */
+	pthread_t child_thread;
+	int rc = pthread_create(&child_thread, NULL, childProcess, (void *)0);
+	if(rc){
+		printf("Error:unable to create thread %d\n", rc);
+        exit(-1);
+	}
 	/*** IF PARENT PROCESS ***/
+
+
+	/*
 	if (pid > 0) {
 		while(true){
 			c = *(rcvchar(sockfd, rxq));
-			/* Quit on end of file */
+			// Quit on end of file
 			if (c == Endfile){
 				exit(0);
 			}
 		}
 	}
+	*/
 	/*** ELSE IF CHILD PROCESS ***/
-	else if (pid == 0) {
+	/*else if (pid == 0) {
 		while(true){
 
 			break;
 	 		/* Call q_get */
 	 		/* Can introduce some delay here. */
-	 	}
-	}
+/*	 	}
+	}*/
+
+	pthread_exit(NULL);
 	return 0;
 }
 
