@@ -76,7 +76,6 @@ int main(int argc, char *argv[]){
 	kirimXOFF[1] = '\0';
 	kirimXON[0] = (char) XON;
 	kirimXON[1] = '\0';
-
    	serv_addr.sin_family = AF_INET;
    	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
    	if (argc > 2) {
@@ -177,7 +176,11 @@ static Byte *q_get(QTYPE *q){
 		send_xoff = false;
 		printf("Buffer < maximum lowerlimit.\n");
 		printf("Mengirim XON\n");
-		sendto(sockfd, kirimXON, 1, 0, (struct sockaddr*)&cli_addr, clilen);
+		int x = sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&cli_addr , clilen);
+		if (x < 0) {
+			printf("error: wrong socket\n");
+			exit(-3);
+		}
 	}
 
 	/*
