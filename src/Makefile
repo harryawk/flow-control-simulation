@@ -7,4 +7,4 @@ receiver:
 	g++ -std=c++11 -o receiver T1_rx.cpp dcomm.h -lpthread
 
 clean:
-	rm receiver transmitter
+	rm -f receiver transmitter

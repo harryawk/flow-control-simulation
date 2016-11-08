@@ -28,29 +28,36 @@ Byte rxbuf[RXQSIZE];
 char clientName[1000];
 QTYPE rcvq = { 0, 0, 0, RXQSIZE, rxbuf };
 QTYPE *rxq = &rcvq;
-Byte sent_xonxoff = XON;
 bool send_xon = false, send_xoff = false;
 
 /* Socket */
 int sockfd; //listen on sock_fd
 
+char kirimXOFF[10];
+char kirimXON[10];
 /* Functions declaration */
 static Byte *rcvchar(int, QTYPE *);
 static Byte *q_get(QTYPE *);
 
-struct sockaddr_in serv_addr;
-
-
+struct sockaddr_in serv_addr, cli_addr;
+socklen_t addrlen = sizeof(serv_addr), clilen = sizeof(cli_addr);
+int byte_idx = 0;
 void *childProcess(void *threadid){
 	int byte_now = 0;
+	struct timespec t_per_recv;
+	t_per_recv.tv_sec = 1;
+	t_per_recv.tv_nsec = 0;
+
 	while(true){
 		Byte *now;
 		now = q_get(rxq);
-		printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
-		sleep(1);
+		if(now != NULL){
+			printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
+			nanosleep(&t_per_recv, NULL);
+		}
+
 		/* Call q_get */
 		/* Can introduce some delay here. */
-		break;
 	}
 	pthread_exit(NULL);
 }
@@ -62,11 +69,13 @@ int main(int argc, char *argv[]){
 	 * Insert code here to bind socket to the port number given in argv[1]
 	 */
 	// create socket
-	int serversock = socket(AF_INET, SOCK_DGRAM, 0);
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	// initialize server address
-
-
+	kirimXOFF[0] = (char) XOFF;
+	kirimXOFF[1] = '\0';
+	kirimXON[0] = (char) XON;
+	kirimXON[1] = '\0';
    	serv_addr.sin_family = AF_INET;
    	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
    	if (argc > 2) {
@@ -75,8 +84,7 @@ int main(int argc, char *argv[]){
    		serv_addr.sin_port = htons(13514);
    	}
    	//bzero((char *) &serv_addr, sizeof(serv_addr));
-	socklen_t addrlen = sizeof(serv_addr);
-   	if (bind(serversock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+   	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
    		perror("ERROR : on binding");
    		exit(1);
    	}
@@ -93,12 +101,12 @@ int main(int argc, char *argv[]){
 	/* Create child process */
 	/*pid_t pid = fork(); */
 	pthread_t child_thread;
+	// (void *)
 	int rc = pthread_create(&child_thread, NULL, childProcess, (void *)0);
 	if(rc){
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
-
 	/*** IF PARENT PROCESS ***/
 	while(true){
 		c = *(rcvchar(sockfd, rxq));
@@ -108,30 +116,38 @@ int main(int argc, char *argv[]){
 		}
 	}
 	/*** ELSE IF CHILD PROCESS ***/ // udah ditaro diatas
-
+	pthread_join(child_thread, NULL);
 	pthread_exit(NULL);
 	return 0;
 }
 
 static Byte *rcvchar(int sockfd, QTYPE *q){
 
-	//gayakin sama ini plis
+	Byte *cur;
 	char c[10];
-	recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&serv_addr , &addrlen);
+	int byte_recv = recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&cli_addr, &clilen);
+	if(byte_recv < 0){
+		printf("Error receiving: %d", byte_recv);
+		// perror(recvfrom);
+		exit(-2);
+	}
 	q->count++;
 	q->data[q->rear] = c[0];
+	cur = &(q->data[q->rear]);
 	q->rear++;
-
 	if(q->rear == RXQSIZE) {
 		q->rear = 0;
 	}
 
-	if(q->count >= 10 && !send_xoff){
+	printf("Menerima byte ke-%d.\n", ++byte_idx);
+	if(q->count >= 8 && !send_xoff){
 		send_xoff = true;
-		char kirimXOFF = XOFF;
+		send_xon = false;
 		printf("Buffer > minimum upperlimit.\n");
-		sendto(sockfd, (char*)&kirimXOFF, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		printf("Mengirim XOFF\n");
+		sendto(sockfd, kirimXOFF, 1, 0, (struct sockaddr*)&cli_addr, clilen);
 	}
+	return cur;
 }
 	/*
 	 * Insert code here.
@@ -147,7 +163,7 @@ static Byte *q_get(QTYPE *q){
 	Byte *current;
 	/* Nothing in the queue */
 	if(!q->count) return (NULL);
-	q->count--;
+	(q->count)--;
 	current = &(q->data[q->front]);
 	q->front++;
 
@@ -155,11 +171,16 @@ static Byte *q_get(QTYPE *q){
 		q->front = 0;
 	}
 
-	if(q->count <= 4 && !send_xon){
+	if(q->count < 4 && !send_xon){
 		send_xon = true;
-		char kirimXON = XON;
-		puts("Buffer < maximum lowerlimit.");
-		sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		send_xoff = false;
+		printf("Buffer < maximum lowerlimit.\n");
+		printf("Mengirim XON\n");
+		int x = sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&cli_addr , clilen);
+		if (x < 0) {
+			printf("error: wrong socket\n");
+			exit(-3);
+		}
 	}
 
 	/*
