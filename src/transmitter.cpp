@@ -1,29 +1,45 @@
 #include "dcomm.h"
-#include <sys/socket.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <iostream>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <strings.h>
 #include <string.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <limits.h>
 #include <stdio.h>
 #include <pthread.h>
-
 using namespace std;
 
+void *childProcess(void *threadid){
+	int byte_now = 0;
+	while(true){
+		break;
+	}
+	pthread_exit(NULL);
+}
 
 int main(int argc, char *argv[] ){
 
 	/* Create socket */
 	struct sockaddr_in serv_addr;
 	socklen_t addrlen = sizeof(serv_addr);
+	char clientName[1000];
 
-	int serversock = socket(AF_INET, SOCK_DGRAM, 0);
+	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	serv_addr.sin_family = AF_INET;
-   	serv_addr.in_addr.s_addr = inet_addr(argv[1]);
+   	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
    	if (argc > 2) {
    		serv_addr.sin_port = htons(atoi(argv[2]));
    	} else {
    		serv_addr.sin_port = htons(13514);
    	}
 
-   	if (bind(serversock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+   	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
    		perror("ERROR : on binding");
    		exit(1);
    	}
@@ -59,7 +75,7 @@ int main(int argc, char *argv[] ){
 	int i=1;
 	char cc;
 	FILE* myfile = fopen(argv[3], "r");
-	while (!myfile.eof()){
+	while (!feof(myfile)){
 		fscanf(myfile, "%c", &cc);
 		printf("Mengirim byte ke-%d: \'%c\' \n", i, cc);
 		i++;
