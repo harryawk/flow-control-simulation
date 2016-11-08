@@ -38,19 +38,21 @@ int sockfd; //listen on sock_fd
 static Byte *rcvchar(int, QTYPE *);
 static Byte *q_get(QTYPE *);
 
-struct sockaddr_in serv_addr;
-socklen_t addrlen;
+struct sockaddr_in serv_addr, cli_addr;
+socklen_t addrlen = sizeof(serv_addr), clilen = sizeof(cli_addr);
 
 void *childProcess(void *threadid){
 	int byte_now = 0;
 	while(true){
 		Byte *now;
 		now = q_get(rxq);
-		printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
-		sleep(1);
+		if(now != NULL){
+			printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
+			sleep(1);
+		}
+		
 		/* Call q_get */
 		/* Can introduce some delay here. */
-		break;
 	}
 	pthread_exit(NULL);
 }
@@ -62,7 +64,7 @@ int main(int argc, char *argv[]){
 	 * Insert code here to bind socket to the port number given in argv[1]
 	 */
 	// create socket
-	int serversock = socket(AF_INET, SOCK_DGRAM, 0);
+	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	// initialize server address
 
@@ -75,8 +77,7 @@ int main(int argc, char *argv[]){
    		serv_addr.sin_port = htons(13514);
    	}
    	//bzero((char *) &serv_addr, sizeof(serv_addr));
-	addrlen = sizeof(serv_addr);
-   	if (bind(serversock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+   	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
    		perror("ERROR : on binding");
    		exit(1);
    	}
@@ -109,30 +110,37 @@ int main(int argc, char *argv[]){
 		}
 	}
 	/*** ELSE IF CHILD PROCESS ***/ // udah ditaro diatas
-
+	printf("hai\n");
 	pthread_exit(NULL);
 	return 0;
 }
 
 static Byte *rcvchar(int sockfd, QTYPE *q){
 
-	//gayakin sama ini plis
+	Byte *cur;
 	char c[10];
-	recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&serv_addr , &addrlen);
+	int byte_recv = recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&cli_addr, &clilen);
+	if(byte_recv < 0){
+		printf("Error receiving: %d", byte_recv);
+		// perror(recvfrom);
+		exit(-2);
+	}
 	q->count++;
 	q->data[q->rear] = c[0];
+	cur = &(q->data[q->rear]);
 	q->rear++;
-
 	if(q->rear == RXQSIZE) {
 		q->rear = 0;
 	}
 
 	if(q->count >= 10 && !send_xoff){
 		send_xoff = true;
+		send_xon = false;
 		char kirimXOFF = XOFF;
 		printf("Buffer > minimum upperlimit.\n");
-		sendto(sockfd, (char*)&kirimXOFF, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		sendto(sockfd, (char*)&kirimXOFF, 1, 0, (struct sockaddr*)&cli_addr , clilen);
 	}
+	return cur;
 }
 	/*
 	 * Insert code here.
@@ -158,9 +166,10 @@ static Byte *q_get(QTYPE *q){
 
 	if(q->count <= 4 && !send_xon){
 		send_xon = true;
+		send_xoff = false;
 		char kirimXON = XON;
-		puts("Buffer < maximum lowerlimit.");
-		sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		printf("Buffer < maximum lowerlimit.\n");
+		sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&cli_addr , clilen);
 	}
 
 	/*
