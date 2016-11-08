@@ -22,7 +22,6 @@ socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
 int sockfd;
 
 void *childProcess(void *threadid){
-	int byte_now = 0;
 	while(true){
 		// child receieve xon/xoff signal
 		char c[10];
@@ -54,7 +53,7 @@ int main(int argc, char *argv[] ){
    	// 	exit(1);
    	// }
    	// if get out of here : serversock binded
-	inet_ntop(AF_INET, &cli_addr.sin_addr, receiverAddress, sizeof (receiverAddress));
+	inet_ntop(AF_INET, &serv_addr.sin_addr, receiverAddress, sizeof (receiverAddress));
 
 	printf("Membuat socket untuk koneksi ke %s:%d ...\n", receiverAddress, htons(serv_addr.sin_port));
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
