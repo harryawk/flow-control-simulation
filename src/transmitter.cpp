@@ -15,10 +15,26 @@
 #include <pthread.h>
 using namespace std;
 
+bool xoff = false;
+char receiverAddress[1000];
+struct sockaddr_in serv_addr, cli_addr;
+socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
+int sockfd;
+
 void *childProcess(void *threadid){
 	int byte_now = 0;
 	while(true){
-		break;
+		// child receieve xon/xoff signal
+		char c[10];
+		recvfrom(sockfd, c, 1, 0, (struct sockaddr*) &serv_addr, &serv_len);
+		if(c[0] == XOFF){
+			printf("XOFF diterima.\n");
+			xoff = true;
+		}
+		else if(c[0] == XON){
+			printf("XON diterima.\n");
+			xoff = false;
+		}
 	}
 	pthread_exit(NULL);
 }
@@ -26,27 +42,22 @@ void *childProcess(void *threadid){
 int main(int argc, char *argv[] ){
 
 	/* Create socket */
-	struct sockaddr_in serv_addr;
-	socklen_t addrlen = sizeof(serv_addr);
-	char clientName[1000];
 
-	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	//define a client socket
 	serv_addr.sin_family = AF_INET;
    	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
-   	if (argc > 2) {
-   		serv_addr.sin_port = htons(atoi(argv[2]));
-   	} else {
-   		serv_addr.sin_port = htons(13514);
-   	}
+   	serv_addr.sin_port = htons(atoi(argv[2]));
 
    	// if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
    	// 	perror("ERROR : on binding");
    	// 	exit(1);
    	// }
    	// if get out of here : serversock binded
-	inet_ntop(AF_INET, &serv_addr.sin_addr, clientName, sizeof (clientName));
+	inet_ntop(AF_INET, &cli_addr.sin_addr, receiverAddress, sizeof (receiverAddress));
 
-	printf("Membuat socket untuk koneksi ke %s:%s ...\n", argv[1], argv[2]);
+	printf("Membuat socket untuk koneksi ke %s:%d ...\n", receiverAddress, htons(serv_addr.sin_port));
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	/* Create child process */
 
@@ -57,34 +68,22 @@ int main(int argc, char *argv[] ){
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
-
-	// child receieve xon/xoff signal
-	char c[10];
-	recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&serv_addr , &addrlen);
-	if(c[0]==XOFF){
-		printf("XOFF diterima.\n");
-
-		printf("Menunggu XON...\n");
-	}
-	if(c[0]==XON){
-	
-		printf("XON diterima.\n");
-	}
-
 	// parent send data
 
-	int i=1;
 	char cc;
+	int idx = 0;
 	FILE* myfile = fopen(argv[3], "r");
 	while (!feof(myfile)){
 		fscanf(myfile, "%c", &cc);
-		printf("Mengirim byte ke-%d: \'%c\' \n", i, cc);
-		i++;
-		sendto(sockfd, (char*)&cc, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		printf("Mengirim byte ke-%d: \'%c\' \n", idx, cc);
+		idx++;
+		sendto(sockfd, (char*)&cc, 1, 0, (struct sockaddr*)&serv_addr, serv_len);
 		sleep(0.1);
+		while(xoff){
+			printf("Menunggu XON...\n");
+			sleep(2);
+		}
 	}
 	fclose(myfile);
-
-
 	return 0;
 }
