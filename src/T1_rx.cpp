@@ -39,7 +39,7 @@ static Byte *rcvchar(int, QTYPE *);
 static Byte *q_get(QTYPE *);
 
 struct sockaddr_in serv_addr;
-
+socklen_t addrlen;
 
 void *childProcess(void *threadid){
 	int byte_now = 0;
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]){
    		serv_addr.sin_port = htons(13514);
    	}
    	//bzero((char *) &serv_addr, sizeof(serv_addr));
-	socklen_t addrlen = sizeof(serv_addr);
+	addrlen = sizeof(serv_addr);
    	if (bind(serversock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
    		perror("ERROR : on binding");
    		exit(1);
@@ -93,6 +93,7 @@ int main(int argc, char *argv[]){
 	/* Create child process */
 	/*pid_t pid = fork(); */
 	pthread_t child_thread;
+	// (void *)
 	int rc = pthread_create(&child_thread, NULL, childProcess, (void *)0);
 	if(rc){
 		printf("Error:unable to create thread %d\n", rc);

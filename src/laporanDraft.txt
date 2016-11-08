@@ -13,11 +13,17 @@ Minimum upperlimit harus lebih kecil dari yang dapat ditampung buffer agar menja
 Petunjuk kompilasi program:
 
 memakai makefile (dijelasin ga yah?)
+Pre-requisite: OS yang digunakan untuk running adalah Ubuntu
+1. Buka terminal pada komputer
+2. change directory ke directory src dari program
+3. ketikkan "make transmitter" untuk kompilasi transmitter
+4. ketikkan "make receiver" untuk kompilasi receiver
 
 -------------------
 Sumber referensi:
 recvfrom sama sendto aja sih kayaknya (?) kalo mau ditambahin silahkan
 http://stackoverflow.com/questions/1229321/sending-structure-using-recvfrom-and-sendto
+
 
 -------------------
 Pembagian kerja dalam kelompok

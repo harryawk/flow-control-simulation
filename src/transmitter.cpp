@@ -39,10 +39,10 @@ int main(int argc, char *argv[] ){
    		serv_addr.sin_port = htons(13514);
    	}
 
-   	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-   		perror("ERROR : on binding");
-   		exit(1);
-   	}
+   	// if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+   	// 	perror("ERROR : on binding");
+   	// 	exit(1);
+   	// }
    	// if get out of here : serversock binded
 	inet_ntop(AF_INET, &serv_addr.sin_addr, clientName, sizeof (clientName));
 
@@ -51,7 +51,8 @@ int main(int argc, char *argv[] ){
 	/* Create child process */
 
 	pthread_t child_thread;
-	int rc = pthread_create(&child_thread, NULL, childProcess, (void *)0);
+	// (void *)
+	int rc = pthread_create(&child_thread, NULL, childProcess, 0);
 	if(rc){
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
