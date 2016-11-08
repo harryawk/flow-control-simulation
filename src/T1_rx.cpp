@@ -126,9 +126,9 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 		queue->rear = 0;
 	}
 
-	if(queue->rear == queue->front){
+	if(queue->count >= 10 && !send_xoff){
 		send_xoff = true;
-		sendto(sockfd, (char*)XOFF, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		sendto(sockfd, (char*)&XOFF, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
 	}
 }
 	/*
@@ -148,9 +148,14 @@ static Byte *q_get(QTYPE *queue){
 	queue->count--;
 	current = &(queue->data[queue->front]);
 	queue->front++;
-	if(queue->count < 4 && !send_xon){
+
+	if(queue->front == RXQSIZE){
+		queue->front = 0;
+	}
+
+	if(queue->count <= 4 && !send_xon){
 		send_xon = true;
-		sendto(sockfd, (char*)XON, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		sendto(sockfd, (char*)&XON, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
 	}
 
 	/*
