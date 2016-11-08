@@ -28,29 +28,34 @@ Byte rxbuf[RXQSIZE];
 char clientName[1000];
 QTYPE rcvq = { 0, 0, 0, RXQSIZE, rxbuf };
 QTYPE *rxq = &rcvq;
-Byte sent_xonxoff = XON;
 bool send_xon = false, send_xoff = false;
 
 /* Socket */
 int sockfd; //listen on sock_fd
 
+char kirimXOFF[10];
+char kirimXON[10];
 /* Functions declaration */
 static Byte *rcvchar(int, QTYPE *);
 static Byte *q_get(QTYPE *);
 
 struct sockaddr_in serv_addr, cli_addr;
 socklen_t addrlen = sizeof(serv_addr), clilen = sizeof(cli_addr);
-
+int byte_idx = 0;
 void *childProcess(void *threadid){
 	int byte_now = 0;
+	struct timespec t_per_recv;
+	t_per_recv.tv_sec = 1;
+	t_per_recv.tv_nsec = 0;
+
 	while(true){
 		Byte *now;
 		now = q_get(rxq);
 		if(now != NULL){
 			printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
-			sleep(1);
+			nanosleep(&t_per_recv, NULL);
 		}
-		
+
 		/* Call q_get */
 		/* Can introduce some delay here. */
 	}
@@ -64,10 +69,13 @@ int main(int argc, char *argv[]){
 	 * Insert code here to bind socket to the port number given in argv[1]
 	 */
 	// create socket
-	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	// initialize server address
-
+	kirimXOFF[0] = (char) XOFF;
+	kirimXOFF[1] = '\0';
+	kirimXON[0] = (char) XON;
+	kirimXON[1] = '\0';
 
    	serv_addr.sin_family = AF_INET;
    	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
@@ -100,7 +108,6 @@ int main(int argc, char *argv[]){
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
-
 	/*** IF PARENT PROCESS ***/
 	while(true){
 		c = *(rcvchar(sockfd, rxq));
@@ -110,7 +117,7 @@ int main(int argc, char *argv[]){
 		}
 	}
 	/*** ELSE IF CHILD PROCESS ***/ // udah ditaro diatas
-	printf("hai\n");
+	pthread_join(child_thread, NULL);
 	pthread_exit(NULL);
 	return 0;
 }
@@ -133,12 +140,13 @@ static Byte *rcvchar(int sockfd, QTYPE *q){
 		q->rear = 0;
 	}
 
-	if(q->count >= 10 && !send_xoff){
+	printf("Menerima byte ke-%d.\n", ++byte_idx);
+	if(q->count >= 8 && !send_xoff){
 		send_xoff = true;
 		send_xon = false;
-		char kirimXOFF = XOFF;
 		printf("Buffer > minimum upperlimit.\n");
-		sendto(sockfd, (char*)&kirimXOFF, 1, 0, (struct sockaddr*)&cli_addr , clilen);
+		printf("Mengirim XOFF\n");
+		sendto(sockfd, kirimXOFF, 1, 0, (struct sockaddr*)&cli_addr, clilen);
 	}
 	return cur;
 }
@@ -156,7 +164,7 @@ static Byte *q_get(QTYPE *q){
 	Byte *current;
 	/* Nothing in the queue */
 	if(!q->count) return (NULL);
-	q->count--;
+	(q->count)--;
 	current = &(q->data[q->front]);
 	q->front++;
 
@@ -164,12 +172,12 @@ static Byte *q_get(QTYPE *q){
 		q->front = 0;
 	}
 
-	if(q->count <= 4 && !send_xon){
+	if(q->count < 4 && !send_xon){
 		send_xon = true;
 		send_xoff = false;
-		char kirimXON = XON;
 		printf("Buffer < maximum lowerlimit.\n");
-		sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&cli_addr , clilen);
+		printf("Mengirim XON\n");
+		sendto(sockfd, kirimXON, 1, 0, (struct sockaddr*)&cli_addr, clilen);
 	}
 
 	/*

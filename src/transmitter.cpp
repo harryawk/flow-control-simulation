@@ -22,17 +22,28 @@ socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
 int sockfd;
 
 void *childProcess(void *threadid){
+	int now = 0;
+	struct timespec t_per_recv;
+	t_per_recv.tv_sec = 0;
+	t_per_recv.tv_nsec = 100000000;
+
 	while(true){
 		// child receieve xon/xoff signal
 		char c[10];
-		recvfrom(sockfd, c, 1, 0, (struct sockaddr*) &serv_addr, &serv_len);
-		if(c[0] == XOFF){
-			printf("XOFF diterima.\n");
-			xoff = true;
+		memset(c, 0,sizeof c);
+		int rc = recvfrom(sockfd, c, 1, 0, (struct sockaddr*) &serv_addr, &serv_len);
+		if(rc < 0){
+			printf("Error receiving byte: %d", rc);
+			// perror(recvfrom);
+			exit(-2);
 		}
-		else if(c[0] == XON){
+		if(c[0] == XON){
 			printf("XON diterima.\n");
 			xoff = false;
+		}
+		else if(c[0] == XOFF){
+			printf("XOFF diterima.\n");
+			xoff = true;
 		}
 	}
 	pthread_exit(NULL);
@@ -73,16 +84,22 @@ int main(int argc, char *argv[] ){
 	int idx = 0;
 	FILE* myfile = fopen(argv[3], "r");
 	while (!feof(myfile)){
-		fscanf(myfile, "%c", &cc);
-		printf("Mengirim byte ke-%d: \'%c\' \n", idx, cc);
-		idx++;
-		sendto(sockfd, (char*)&cc, 1, 0, (struct sockaddr*)&serv_addr, serv_len);
-		sleep(0.1);
-		while(xoff){
+		if(!xoff){
+			fscanf(myfile, "%c", &cc);
+			idx++;
+			printf("Mengirim byte ke-%d: \'%c\' \n", idx, cc);
+			sendto(sockfd, (char*)&cc, 1, 0, (struct sockaddr*)&serv_addr, serv_len);
+			struct timespec t_per_send, t_xon;
+			t_per_send.tv_sec = 0;
+			t_per_send.tv_nsec = 100000000;
+			nanosleep(&t_per_send, NULL);
+		}
+		else{
 			printf("Menunggu XON...\n");
 			sleep(2);
 		}
 	}
 	fclose(myfile);
+	pthread_exit(NULL);
 	return 0;
 }
