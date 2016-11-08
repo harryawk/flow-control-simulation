@@ -64,11 +64,11 @@ int main(int argc, char *argv[]){
 	 * Insert code here to bind socket to the port number given in argv[1]
 	 */
 	// create socket
-	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	// initialize server address
 
-
+	// bzero((struct sockaddr*)&serv_addr, sizeof(serv_addr));
    	serv_addr.sin_family = AF_INET;
    	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
    	if (argc > 2) {
@@ -169,7 +169,11 @@ static Byte *q_get(QTYPE *q){
 		send_xoff = false;
 		char kirimXON = XON;
 		printf("Buffer < maximum lowerlimit.\n");
-		sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&cli_addr , clilen);
+		int x = sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&cli_addr , clilen);
+		if (x < 0) {
+			printf("error: wrong socket\n");
+			exit(-3);
+		}
 	}
 
 	/*
