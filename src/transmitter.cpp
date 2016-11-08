@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 
 using namespace std;
 
@@ -31,19 +32,31 @@ int main(int argc, char *argv[] ){
 	printf("Membuat socket untuk koneksi ke %s:%s ...\n", argv[1], argv[2]);
 	
 	/* Create child process */
+	pthread_t child_thread;
+	int rc = pthread_create(&child_thread, NULL, childProcess, (void *)0);
+	if(rc){
+		printf("Error:unable to create thread %d\n", rc);
+        exit(-1);
+	}
 	
 	// child receieve xon/xoff signal
+	char c[10];
+	recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&serv_addr , &addrlen);
+	if(c[0]==XOFF){
 		printf("XOFF diterima.\n");
 		
 		printf("Menunggu XON...\n");
-		
-		printf("XON diterima.\n");
+	}
+	if(c[0]==XON){
 	
+		printf("XON diterima.\n");
+	}
+
 	// parent send data
 	
 	int i=1;
 	char cc;
-	FILE myfile = fopen(argv[3], "r"];
+	FILE *myfile = fopen(argv[3], "r"];
 	while (!eof()){
 		fscanf(myfile, %c, &cc);
 		printf("Mengirim byte ke-%d: \'%c\' \n", i, cc);
