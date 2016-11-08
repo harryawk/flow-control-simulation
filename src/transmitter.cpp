@@ -10,7 +10,6 @@ int main(int argc, char *argv[] ){
 
 	/* Create socket */
 	printf("Membuat socket untuk koneksi ke %s:%s ...\n", argv[1], argv[2]);
-
 	/* Create child process */
 
 	// child receieve xon/xoff signal

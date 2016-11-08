@@ -22,7 +22,7 @@
 #define DELAY 500
 
 /* Define receive buffer size */
-#define RXQSIZE 8
+#define RXQSIZE 16
 
 Byte rxbuf[RXQSIZE];
 char clientName[1000];
@@ -42,10 +42,15 @@ struct sockaddr_in serv_addr;
 socklen_t addrlen = sizeof(serv_addr);
 
 void *childProcess(void *threadid){
+	int byte_now = 0;
 	while(true){
-		break;
+		Byte *now;
+		now = q_get(rxq);
+		printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
+		sleep(1);
 		/* Call q_get */
 		/* Can introduce some delay here. */
+		break;
 	}
 	pthread_exit(NULL);
 }
@@ -64,7 +69,7 @@ int main(int argc, char *argv[]){
 
    	serv_addr.sin_family = AF_INET;
    	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
-   	if (argc > 1) {
+   	if (argc > 2) {
    		serv_addr.sin_port = htons(atoi(argv[2]));
    	} else {
    		serv_addr.sin_port = htons(13514);
@@ -93,6 +98,7 @@ int main(int argc, char *argv[]){
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
+
 	/*** IF PARENT PROCESS ***/
 	while(true){
 		c = *(rcvchar(sockfd, rxq));
@@ -113,8 +119,18 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 	char c[10];
 	recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&serv_addr , &addrlen);
 	queue->count++;
-	queue->data[queue->rear] = *c;
+	queue->data[queue->rear] = c[0];
 	queue->rear++;
+
+	if(queue->rear == RXQSIZE) {
+		queue->rear = 0;
+	}
+
+	if(queue->rear == queue->front){
+		send_xoff = true;
+		sendto(sockfd, (char*)XOFF, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+	}
+}
 	/*
 	 * Insert code here.
 	 * Read a character from socket and put it to the receive buffer.
@@ -122,9 +138,6 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 	 * certain level, then send XOFF and set a flag (why?).
 	 * Return a pointer to the buffer where data is put.
 	 */
-	return queue->data;
-}
-
 /* q_get returns a pointer to the buffer where data is read
  * or NULL if buffer is empty/
  */
@@ -132,10 +145,17 @@ static Byte *q_get(QTYPE *queue){
 	Byte *current;
 	/* Nothing in the queue */
 	if(!queue->count) return (NULL);
+	queue->count--;
+	current = &(queue->data[queue->front]);
+	queue->front++;
+	if(queue->count < 4 && !send_xon){
+		send_xon = true;
+		sendto(sockfd, (char*)XON, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+	}
 
 	/*
 	 * Insert code here.
-	 * Retrieve data from buffer, save it to "current" and "data"
+	 * Retrieve data from buffer, save it to "current"
 	 * If the number of characters in the recieve buffer is below
 	 * certain level, then send XON.
 	 * Increment front index and check for wraparound.
