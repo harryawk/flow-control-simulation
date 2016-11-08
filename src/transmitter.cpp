@@ -63,6 +63,7 @@ int main(int argc, char *argv[] ){
 		fscanf(myfile, "%c", &cc);
 		printf("Mengirim byte ke-%d: \'%c\' \n", i, cc);
 		i++;
+		sendto(sockfd, (char*)&cc, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
 		sleep(0.1);
 	}
 	fclose(myfile);
