@@ -39,7 +39,7 @@ static Byte *rcvchar(int, QTYPE *);
 static Byte *q_get(QTYPE *);
 
 struct sockaddr_in serv_addr;
-socklen_t addrlen = sizeof(serv_addr);
+
 
 void *childProcess(void *threadid){
 	int byte_now = 0;
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]){
    		serv_addr.sin_port = htons(13514);
    	}
    	//bzero((char *) &serv_addr, sizeof(serv_addr));
-
+	socklen_t addrlen = sizeof(serv_addr);
    	if (bind(serversock, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
    		perror("ERROR : on binding");
    		exit(1);

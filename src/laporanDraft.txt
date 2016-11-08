@@ -1,0 +1,26 @@
+Pada tugas kecil ini, socketnya menggunakan UDP agar dapat mensimulasikan flow control, dimana server hanya perlu mengirimkan satu paket di waktu yang tidak bersamaan. Jika terdapat delay antara satu paket dengan paket yang lainnya saat dikirimkan, maka dijamin paket akan sampai secara berurutan, sehingga tidak perlu memakai TCP yang memiliki panjang header yang lebih banyak daripada UDP.
+
+Perbedaan UDP dan TCP (nanti dimasukkin dalam tabel aja):
+TCP:                                                UDP:
+Connection-oriented                                 Connectionless
+Terdapat flow control                               Tidak terdapat flow control
+Dipakai untuk mengirim data                         Dipakai untuk mengirim data
+    yang dapat mentoleransi delay                       yang real time
+Panjang Header lebih panjang                        Panjang header lebih sedikit
+
+Minimum upperlimit harus lebih kecil dari yang dapat ditampung buffer agar menjamin bahwa tidak ada data yang tidak ditampung dalam buffer, yang menyebabkan hilangnya data yang dikirim.
+-------------------
+Petunjuk kompilasi program:
+
+memakai makefile (dijelasin ga yah?)
+
+-------------------
+Sumber referensi:
+recvfrom sama sendto aja sih kayaknya (?) kalo mau ditambahin silahkan
+http://stackoverflow.com/questions/1229321/sending-structure-using-recvfrom-and-sendto
+
+-------------------
+Pembagian kerja dalam kelompok
+Hasna: Transmitter (?)
+Radit: Receiver
+Harry: Checker dan Debugger of Transmitter and Receiver
