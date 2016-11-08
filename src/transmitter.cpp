@@ -54,8 +54,6 @@ int main(int argc, char *argv[] ){
 		printf("XON diterima.\n");
 	}
 
-		printf("XON diterima.\n");
-
 	// parent send data
 
 	int i=1;
@@ -68,8 +66,6 @@ int main(int argc, char *argv[] ){
 		sleep(0.1);
 	}
 	fclose(myfile);
-
-
 
 
 	return 0;
