@@ -1,5 +1,4 @@
-all:
-	transmitter receiver
+all: transmitter receiver
 
 transmitter:
 	g++ -std=c++11 -o transmitter transmitter.cpp dcomm.h -lpthread
