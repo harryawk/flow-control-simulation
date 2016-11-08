@@ -35,7 +35,7 @@ bool send_xon = false, send_xoff = false;
 int sockfd; //listen on sock_fd
 
 /* Functions declaration */
-static Byte *rcvchar(int sockfd, QTYPE *queue);
+static Byte *rcvchar(int, QTYPE *);
 static Byte *q_get(QTYPE *);
 
 struct sockaddr_in serv_addr;
@@ -113,22 +113,23 @@ int main(int argc, char *argv[]){
 	return 0;
 }
 
-static Byte *rcvchar(int sockfd, QTYPE *queue){
+static Byte *rcvchar(int sockfd, QTYPE *q){
 
 	//gayakin sama ini plis
 	char c[10];
 	recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&serv_addr , &addrlen);
-	queue->count++;
-	queue->data[queue->rear] = c[0];
-	queue->rear++;
+	q->count++;
+	q->data[q->rear] = c[0];
+	q->rear++;
 
-	if(queue->rear == RXQSIZE) {
-		queue->rear = 0;
+	if(q->rear == RXQSIZE) {
+		q->rear = 0;
 	}
 
-	if(queue->count >= 10 && !send_xoff){
+	if(q->count >= 10 && !send_xoff){
 		send_xoff = true;
-		sendto(sockfd, (char*)&XOFF, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		char kirimXOFF = XOFF;
+		sendto(sockfd, (char*)&kirimXOFF, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
 	}
 }
 	/*
@@ -141,21 +142,22 @@ static Byte *rcvchar(int sockfd, QTYPE *queue){
 /* q_get returns a pointer to the buffer where data is read
  * or NULL if buffer is empty/
  */
-static Byte *q_get(QTYPE *queue){
+static Byte *q_get(QTYPE *q){
 	Byte *current;
 	/* Nothing in the queue */
-	if(!queue->count) return (NULL);
-	queue->count--;
-	current = &(queue->data[queue->front]);
-	queue->front++;
+	if(!q->count) return (NULL);
+	q->count--;
+	current = &(q->data[q->front]);
+	q->front++;
 
-	if(queue->front == RXQSIZE){
-		queue->front = 0;
+	if(q->front == RXQSIZE){
+		q->front = 0;
 	}
 
-	if(queue->count <= 4 && !send_xon){
+	if(q->count <= 4 && !send_xon){
 		send_xon = true;
-		sendto(sockfd, (char*)&XON, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
+		char kirimXON = XON;
+		sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
 	}
 
 	/*
