@@ -85,7 +85,7 @@ int main(int argc, char *argv[]){
 	printf("Binding pada %s:%d\n", clientName, ntohs(serv_addr.sin_port));
 
 	/* Initialize XON/XOFF flags */
-	send_xon = false;
+	send_xon = true;
 	send_xoff = false;
 
 	/////////// GET HERE /////////////////////
@@ -129,6 +129,7 @@ static Byte *rcvchar(int sockfd, QTYPE *q){
 	if(q->count >= 10 && !send_xoff){
 		send_xoff = true;
 		char kirimXOFF = XOFF;
+		printf("Buffer > minimum upperlimit.\n");
 		sendto(sockfd, (char*)&kirimXOFF, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
 	}
 }
@@ -157,6 +158,7 @@ static Byte *q_get(QTYPE *q){
 	if(q->count <= 4 && !send_xon){
 		send_xon = true;
 		char kirimXON = XON;
+		puts("Buffer < maximum lowerlimit.");
 		sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&serv_addr , sizeof(addrlen));
 	}
 
