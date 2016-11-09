@@ -20,6 +20,7 @@ char receiverAddress[1000];
 struct sockaddr_in serv_addr, cli_addr;
 socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
 int sockfd;
+bool done = false;
 
 /* Child process, receiving XON/XOFF signal from receiver*/
 void *childProcess(void *threadid){
@@ -28,7 +29,7 @@ void *childProcess(void *threadid){
 	t_per_recv.tv_sec = 0;
 	t_per_recv.tv_nsec = 100000000;
 
-	while(true){
+	while(!done){
 		// child receieve xon/xoff signal
 		char c[10];
 		memset(c, 0,sizeof c);
@@ -46,7 +47,6 @@ void *childProcess(void *threadid){
 			xoff = true;
 		}
 	}
-	pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[] ){
@@ -72,7 +72,6 @@ int main(int argc, char *argv[] ){
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
-	
 	/* Parent send data */
 
 	char cc;
@@ -98,6 +97,5 @@ int main(int argc, char *argv[] ){
 	}
 	// reach end of file
 	fclose(myfile);
-	pthread_exit(NULL);
-	return 0;
+	exit(0);
 }
