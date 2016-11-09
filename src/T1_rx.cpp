@@ -17,7 +17,6 @@
 #include <stdio.h>
 #include <pthread.h>
 
-// #include <stderr.h>
 /* Delay to adjust speed of consuming buffer, in milliseconds */
 #define DELAY 500
 
@@ -35,6 +34,7 @@ int sockfd; //listen on sock_fd
 
 char kirimXOFF[10];
 char kirimXON[10];
+
 /* Functions declaration */
 static Byte *rcvchar(int, QTYPE *);
 static Byte *q_get(QTYPE *);
@@ -42,6 +42,8 @@ static Byte *q_get(QTYPE *);
 struct sockaddr_in serv_addr, cli_addr;
 socklen_t addrlen = sizeof(serv_addr), clilen = sizeof(cli_addr);
 int byte_idx = 0;
+
+/* Child process, read character from buffer */
 void *childProcess(void *threadid){
 	int byte_now = 0;
 	struct timespec t_per_recv;
@@ -55,9 +57,6 @@ void *childProcess(void *threadid){
 			printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
 			nanosleep(&t_per_recv, NULL);
 		}
-
-		/* Call q_get */
-		/* Can introduce some delay here. */
 	}
 	pthread_exit(NULL);
 }
@@ -65,9 +64,6 @@ void *childProcess(void *threadid){
 // SERVER PROGRAM
 int main(int argc, char *argv[]){
 	Byte c;
-	/*
-	 * Insert code here to bind socket to the port number given in argv[1]
-	 */
 	// create socket
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -83,8 +79,8 @@ int main(int argc, char *argv[]){
    	} else {
    		serv_addr.sin_port = htons(13514);
    	}
-   	//bzero((char *) &serv_addr, sizeof(serv_addr));
-   	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+
+	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) { //binding error
    		perror("ERROR : on binding");
    		exit(1);
    	}
@@ -96,14 +92,11 @@ int main(int argc, char *argv[]){
 	send_xon = true;
 	send_xoff = false;
 
-	/////////// GET HERE /////////////////////
-
 	/* Create child process */
-	/*pid_t pid = fork(); */
 	pthread_t child_thread;
 	// (void *)
 	int rc = pthread_create(&child_thread, NULL, childProcess, (void *)0);
-	if(rc){
+	if(rc){ //failed creating thread
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
@@ -115,22 +108,23 @@ int main(int argc, char *argv[]){
 			exit(0);
 		}
 	}
-	/*** ELSE IF CHILD PROCESS ***/ // udah ditaro diatas
 	pthread_join(child_thread, NULL);
 	pthread_exit(NULL);
 	return 0;
 }
 
+/* function for reading character and put it to the receive buffer*/
 static Byte *rcvchar(int sockfd, QTYPE *q){
 
 	Byte *cur;
 	char c[10];
 	int byte_recv = recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&cli_addr, &clilen);
-	if(byte_recv < 0){
+	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
-		// perror(recvfrom);
 		exit(-2);
 	}
+	
+	// succeed reading character
 	q->count++;
 	q->data[q->rear] = c[0];
 	cur = &(q->data[q->rear]);
@@ -140,6 +134,9 @@ static Byte *rcvchar(int sockfd, QTYPE *q){
 	}
 
 	printf("Menerima byte ke-%d.\n", ++byte_idx);
+	
+	// receive buffer above minimum upperlimit
+	// sending XOFF
 	if(q->count >= 8 && !send_xoff){
 		send_xoff = true;
 		send_xon = false;
@@ -149,15 +146,9 @@ static Byte *rcvchar(int sockfd, QTYPE *q){
 	}
 	return cur;
 }
-	/*
-	 * Insert code here.
-	 * Read a character from socket and put it to the receive buffer.
-	 * If the number of characters in the receive buffer is above
-	 * certain level, then send XOFF and set a flag (why?).
-	 * Return a pointer to the buffer where data is put.
-	 */
+
 /* q_get returns a pointer to the buffer where data is read
- * or NULL if buffer is empty/
+ * or NULL if buffer is empty
  */
 static Byte *q_get(QTYPE *q){
 	Byte *current;
@@ -171,6 +162,8 @@ static Byte *q_get(QTYPE *q){
 		q->front = 0;
 	}
 
+	// receive buffer below maximum lowerlimit
+	// sending XON
 	if(q->count < 4 && !send_xon){
 		send_xon = true;
 		send_xoff = false;
@@ -182,13 +175,5 @@ static Byte *q_get(QTYPE *q){
 			exit(-3);
 		}
 	}
-
-	/*
-	 * Insert code here.
-	 * Retrieve data from buffer, save it to "current"
-	 * If the number of characters in the recieve buffer is below
-	 * certain level, then send XON.
-	 * Increment front index and check for wraparound.
-	 */
-	 return current;
+	return current;
 }

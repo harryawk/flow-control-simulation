@@ -1,4 +1,3 @@
-
 #include "dcomm.h"
 #include <stdlib.h>
 #include <stddef.h>
@@ -22,6 +21,7 @@ struct sockaddr_in serv_addr, cli_addr;
 socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
 int sockfd;
 
+/* Child process, receiving XON/XOFF signal from receiver*/
 void *childProcess(void *threadid){
 	int now = 0;
 	struct timespec t_per_recv;
@@ -35,7 +35,6 @@ void *childProcess(void *threadid){
 		int rc = recvfrom(sockfd, c, 1, 0, (struct sockaddr*) &serv_addr, &serv_len);
 		if(rc < 0){
 			printf("Error receiving byte: %d", rc);
-			// perror(recvfrom);
 			exit(-2);
 		}
 		if(c[0] == XON){
@@ -54,18 +53,12 @@ int main(int argc, char *argv[] ){
 
 	/* Create socket */
 
-
 	//define a client socket
 	serv_addr.sin_family = AF_INET;
    	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
    	serv_addr.sin_port = htons(atoi(argv[2]));
 
-   	// if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-   	// 	perror("ERROR : on binding");
-   	// 	exit(1);
-   	// }
-   	// if get out of here : serversock binded
-	inet_ntop(AF_INET, &serv_addr.sin_addr, receiverAddress, sizeof (receiverAddress));
+   	inet_ntop(AF_INET, &serv_addr.sin_addr, receiverAddress, sizeof (receiverAddress));
 
 	printf("Membuat socket untuk koneksi ke %s:%d ...\n", receiverAddress, htons(serv_addr.sin_port));
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -73,33 +66,37 @@ int main(int argc, char *argv[] ){
 	/* Create child process */
 
 	pthread_t child_thread;
-	// (void *)
+	
 	int rc = pthread_create(&child_thread, NULL, childProcess, 0);
-	if(rc){
+	if(rc){ //failed creating thread
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
-	// parent send data
+	
+	/* Parent send data */
 
 	char cc;
 	int idx = 0;
 	FILE* myfile = fopen(argv[3], "r");
+	// reading from file
 	while (!feof(myfile)){
 		if(!xoff){
 			fscanf(myfile, "%c", &cc);
 			idx++;
 			printf("Mengirim byte ke-%d: \'%c\' \n", idx, cc);
+			// send character from file to socket
 			sendto(sockfd, (char*)&cc, 1, 0, (struct sockaddr*)&serv_addr, serv_len);
 			struct timespec t_per_send, t_xon;
 			t_per_send.tv_sec = 0;
 			t_per_send.tv_nsec = 100000000;
 			nanosleep(&t_per_send, NULL);
 		}
-		else{
+		else{ // XOFF sent, receive buffer is above minimum upperlimit
 			printf("Menunggu XON...\n");
 			sleep(2);
 		}
 	}
+	// reach end of file
 	fclose(myfile);
 	pthread_exit(NULL);
 	return 0;
