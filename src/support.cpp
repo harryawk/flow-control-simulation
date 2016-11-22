@@ -9,7 +9,7 @@ unsigned reverse(unsigned x) {
    return x;
 }
 
-unsigned int crc32a(unsigned char *message) {
+unsigned int crc32(unsigned char *message) {
    int i, j;
    unsigned int byte, crc;
 
@@ -28,3 +28,14 @@ unsigned int crc32a(unsigned char *message) {
    }
    return reverse(~crc);
 }
+
+/*
+ * buat pakenya
+ * string s = "";
+ * s += soh;
+ * s += msgno;
+ * s += stx;
+ * s += data;
+ * s += etx;
+ * checksum = crc32(s.c_str);
+ */
