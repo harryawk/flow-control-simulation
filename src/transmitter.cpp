@@ -13,6 +13,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <pthread.h>
+#include "support.h"
 using namespace std;
 
 bool xoff = false;
@@ -22,8 +23,8 @@ socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
 int sockfd;
 bool done = false;
 char c[MAXLEN << 1];
-		
-
+char cc[RXQSIZE];
+Byte lastacked = RXQSIZE - 1, lastsent = 0, countBuf = 0;
 
 /* Child process, receiving XON/XOFF signal from receiver*/
 void *childProcess(void *threadid){
@@ -35,7 +36,8 @@ void *childProcess(void *threadid){
 	while(!done){
 		// child receieve xon/xoff signal
 		memset(c, 0,sizeof c);
-		int rc = recvfrom(sockfd, c, 1, 0, (struct sockaddr*) &serv_addr, &serv_len);
+		int rc = recvfrom(sockfd, c, sizeof(c), 0, (struct sockaddr*) &serv_addr, &serv_len);
+
 		if(rc < 0){
 			printf("Error receiving byte: %d", rc);
 			exit(-2);
@@ -47,6 +49,33 @@ void *childProcess(void *threadid){
 		else if(c[0] == XOFF){
 			printf("XOFF diterima.\n");
 			xoff = true;
+		}
+		else{
+			//ngecek checksum dulu
+
+			//dia nerima ACK / NAK
+			if(c[0] == ACK){
+				lastacked = c[1];
+				if(lastacked <= lastsent){
+					countBuf = lastsent - lastacked;
+				}
+				else{
+					countBuf = lastsent + 1 + (RXQSIZE - 1) - lastacked;
+				}
+			}
+			else{
+				MESGB mesg;
+				mesg.soh = SOH;
+				mesg.stx = STX;
+				mesg.etx = ETX;
+				mesg.msgno = c[1];
+				mesg.data = &cc[c[1]];
+				string s = (char)mesg.soh + (char)mesg.mesgno + (char)mesg.stx + *mesg.data + mesg.etx;
+				mesg.checksum = crc32a(s);
+				s += mesg.checksum;
+				strcpy(c, s.c_str());
+				sendto(sockfd, c, sizeof(c), 0, (struct sockaddr*)&serv_addr, serv_len);
+			}
 		}
 	}
 }
@@ -68,7 +97,7 @@ int main(int argc, char *argv[] ){
 	/* Create child process */
 
 	pthread_t child_thread;
-	
+
 	int rc = pthread_create(&child_thread, NULL, childProcess, 0);
 	if(rc){ //failed creating thread
 		printf("Error:unable to create thread %d\n", rc);
