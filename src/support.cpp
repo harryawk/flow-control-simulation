@@ -1,3 +1,5 @@
+#include "support.h"
+
 unsigned reverse(unsigned x) {
    x = ((x & 0x55555555) <<  1) | ((x >>  1) & 0x55555555);
    x = ((x & 0x33333333) <<  2) | ((x >>  2) & 0x33333333);
@@ -7,7 +9,7 @@ unsigned reverse(unsigned x) {
    return x;
 }
 
-unsigned int crc32a(unsigned char *message) {
+unsigned int crc32(unsigned char *message) {
    int i, j;
    unsigned int byte, crc;
 
@@ -26,3 +28,14 @@ unsigned int crc32a(unsigned char *message) {
    }
    return reverse(~crc);
 }
+
+/*
+ * buat pakenya
+ * string s = "";
+ * s += soh;
+ * s += msgno;
+ * s += stx;
+ * s += data;
+ * s += etx;
+ * checksum = crc32(s.c_str);
+ */
