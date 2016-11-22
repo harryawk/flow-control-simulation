@@ -227,7 +227,7 @@ static MESGB *rcvframe(int sockfd, QTYPE *q){
 
 	// succeed, sendto(transmitter, ACK);
 	
-	int send_ack = sendto(sockfd, ACK, sizeof(ACK), 0, (struct sockaddr*)&cli_addr, &clilen);
+	int send_ack = sendto(sockfd, ACK, sizeof(ACK), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){ //error sending ACK character
 		printf("Error send ACK: %d", send_ack);
 		exit(-2);
