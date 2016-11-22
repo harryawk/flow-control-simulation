@@ -21,9 +21,6 @@
 /* Delay to adjust speed of consuming buffer, in milliseconds */
 #define DELAY 500
 
-/* Define receive buffer size */
-#define RXQSIZE 16
-
 MESGB messages[RXQSIZE];
 
 Byte rxbuf[RXQSIZE];
