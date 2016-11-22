@@ -17,6 +17,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <pthread.h>
+#include "support.h"
 
 /* Delay to adjust speed of consuming buffer, in milliseconds */
 #define DELAY 500
@@ -193,6 +194,7 @@ static Byte *q_get(QTYPE *q){
 	}
 	return current;
 }
+
 
 static MESGB *rcvframe(int sockfd, QTYPE *q){
 	MESGB *cur;

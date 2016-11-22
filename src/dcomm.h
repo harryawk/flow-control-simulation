@@ -25,6 +25,9 @@
 #define BYTESIZE	256 /* The maximum value of a byte */
 #define MAXLEN		1024/* Maximum messages length */
 
+/* Define receive buffer size */
+#define RXQSIZE 16
+
 typedef unsigned char Byte;
 typedef struct QTYPE
 {
@@ -38,15 +41,15 @@ typedef struct QTYPE
 typedef struct MESGB
 {
 	unsigned int soh;
+	Byte msgno;
 	unsigned int stx;
+	Byte *data;
 	unsigned int etx;
 	int checksum;
-	Byte msgno;
-	Byte *data;
 } MESGB;
 
 typedef struct RESP{
-	unsigned int res;
+ 	Byte res;
 	Byte msgno;
 	int checksum;
 } RESP;
