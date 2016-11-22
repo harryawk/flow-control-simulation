@@ -23,6 +23,8 @@
 /* Define receive buffer size */
 #define RXQSIZE 16
 
+MESGB messages[RXQSIZE];
+
 Byte rxbuf[RXQSIZE];
 char clientName[1000];
 QTYPE rcvq = { 0, 0, 0, RXQSIZE, rxbuf };
@@ -46,16 +48,13 @@ int byte_idx = 0;
 /* Child process, read character from buffer */
 void *childProcess(void *threadid){
 	int byte_now = 0;
-	struct timespec t_per_recv;
-	t_per_recv.tv_sec = 1;
-	t_per_recv.tv_nsec = 0;
 
 	while(true){
 		Byte *now;
 		now = q_get(rxq);
 		if(now != NULL){
 			printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
-			nanosleep(&t_per_recv, NULL);
+			usleep(DELAY * 1000);
 		}
 	}
 	pthread_exit(NULL);
@@ -123,7 +122,7 @@ static Byte *rcvchar(int sockfd, QTYPE *q){
 		printf("Error receiving: %d", byte_recv);
 		exit(-2);
 	}
-	
+
 	// succeed reading character
 	q->count++;
 	q->data[q->rear] = c[0];
@@ -134,7 +133,7 @@ static Byte *rcvchar(int sockfd, QTYPE *q){
 	}
 
 	printf("Menerima byte ke-%d.\n", ++byte_idx);
-	
+
 	// receive buffer above minimum upperlimit
 	// sending XOFF
 	if(q->count >= 8 && !send_xoff){
@@ -176,4 +175,8 @@ static Byte *q_get(QTYPE *q){
 		}
 	}
 	return current;
+}
+
+static MESGB *rcvframe(int sockfd){
+	
 }
