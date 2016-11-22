@@ -21,6 +21,9 @@ struct sockaddr_in serv_addr, cli_addr;
 socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
 int sockfd;
 bool done = false;
+char c[MAXLEN << 1];
+		
+
 
 /* Child process, receiving XON/XOFF signal from receiver*/
 void *childProcess(void *threadid){
@@ -31,7 +34,6 @@ void *childProcess(void *threadid){
 
 	while(!done){
 		// child receieve xon/xoff signal
-		char c[10];
 		memset(c, 0,sizeof c);
 		int rc = recvfrom(sockfd, c, 1, 0, (struct sockaddr*) &serv_addr, &serv_len);
 		if(rc < 0){
@@ -74,7 +76,6 @@ int main(int argc, char *argv[] ){
 	}
 	/* Parent send data */
 
-	char cc;
 	int idx = 0;
 	FILE* myfile = fopen(argv[3], "r");
 	// reading from file
@@ -84,7 +85,7 @@ int main(int argc, char *argv[] ){
 			idx++;
 			printf("Mengirim byte ke-%d: \'%c\' \n", idx, cc);
 			// send character from file to socket
-			sendto(sockfd, (char*)&cc, 1, 0, (struct sockaddr*)&serv_addr, serv_len);
+			sendto(sockfd, (char*)&cc, sizeof(cc), 0, (struct sockaddr*)&serv_addr, serv_len);
 			struct timespec t_per_send, t_xon;
 			t_per_send.tv_sec = 0;
 			t_per_send.tv_nsec = 100000000;

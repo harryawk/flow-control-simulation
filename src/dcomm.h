@@ -40,8 +40,15 @@ typedef struct MESGB
 	unsigned int soh;
 	unsigned int stx;
 	unsigned int etx;
-	Byte checksum;
+	int checksum;
 	Byte msgno;
 	Byte *data;
 } MESGB;
+
+typedef struct RESP{
+	unsigned int res;
+	Byte msgno;
+	int checksum;
+} RESP;
+
 #endif
