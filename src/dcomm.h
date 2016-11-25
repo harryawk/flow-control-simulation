@@ -40,12 +40,12 @@ typedef struct QTYPE
 
 typedef struct MESGB
 {
-	unsigned int soh;
+	unsigned char soh;
 	Byte msgno;
-	unsigned int stx;
+	unsigned char stx;
 	Byte *data;
-	unsigned int etx;
-	int checksum;
+	unsigned char etx;
+	unsigned int checksum;
 } MESGB;
 
 typedef struct RESP{
