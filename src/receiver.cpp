@@ -63,6 +63,7 @@ socklen_t addrlen = sizeof(serv_addr), clilen = sizeof(cli_addr);
 void *childProcess(void *threadid);
 void sendACK(int framenum);
 void sendNAK(int framenum);
+
 // SERVER PROGRAM
 int main(int argc, char *argv[]){
 	// create socket
@@ -79,7 +80,7 @@ int main(int argc, char *argv[]){
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
-
+	
 	/*** IF PARENT PROCESS ***/
 	while(true){
 		int ret = rcvframe(sockfd, rxq);
@@ -124,7 +125,9 @@ static Byte* q_get(QTYPE *q){
 
 static int rcvframe(int sockfd, QTYPE *q){
 	memset(recvbuf, 0, sizeof recvbuf);
+	puts("Pi*pin Masuk");
 	int byte_recv = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&cli_addr, &clilen);
+	puts("Pi*pin Keluar");
 	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
 	}
@@ -261,7 +264,9 @@ void *childProcess(void *threadid){
 			usleep(DELAY * 1000);
 		}
 		else{
-			sendNAK(rxq->front);
+			if(rxq->count != 0){
+				sendNAK(rxq->front);
+			}
 		}
 	}
 	pthread_exit(NULL);
