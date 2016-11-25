@@ -209,7 +209,7 @@ static MESGB *rcvframe(int sockfd, QTYPE *q){
 	// cek struktur frame
 	
 	if (c[0].soh != SOH || c[0].stx != STX || c[0].etx != ETX || c[0].msgno != msgno) {
-		printf("kirim NAK\n");
+		printf("kirim NAK header\n");
 		exit(-3);
 	}
 	
@@ -220,16 +220,17 @@ static MESGB *rcvframe(int sockfd, QTYPE *q){
 	checksumarr[1] = c[0].stx;
 	checksumarr[2] = c[0].etx;
 	checksumarr[3] = c[0].msgno;
-	checksumarr[4] = c[0].data[0];
-	unsigned int checksum = crc32(&checksumarr);
+	checksumarr[4] = *(c[0].data);
+	unsigned int checksum = crc32a(checksumarr);
 	if (checksum != c[0].checksum) {
-		printf("kirim NAK\n");
+		printf("kirim NAK checksumarr\n");
 		exit(-4);
 	}
 
 	// succeed, sendto(transmitter, ACK);
-	
-	int send_ack = sendto(sockfd, ACK, sizeof(ACK), 0, (struct sockaddr*)&cli_addr, clilen);
+	int* ack_table;
+	ack_table[0] = ACK;
+	int send_ack = sendto(sockfd, ack_table, sizeof(ACK), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){ //error sending ACK character
 		printf("Error send ACK: %d", send_ack);
 		exit(-2);
@@ -238,8 +239,8 @@ static MESGB *rcvframe(int sockfd, QTYPE *q){
 	// succeed reading character
 ////////////////////////////////////
 	q->count++;
-	q->data[q->rear] = c[0].data;
-	cur.data = &(q->data[q->rear]);
+	q->data[q->rear] = *(c[0].data);
+	cur->data = &(q->data[q->rear]);
 	q->rear++;
 	if(q->rear == RXQSIZE) {
 		q->rear = 0;
