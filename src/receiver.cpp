@@ -135,7 +135,7 @@ static Byte *rcvchar(int sockfd, QTYPE *q){
 	}
 /////////////////////////////////////
 	// cek struktur frame
-	
+
 	// cek checksum
 
 	// succeed, sendto(transmitter, ACK);
@@ -195,40 +195,39 @@ static Byte *q_get(QTYPE *q){
 	return current;
 }
 
-
 static MESGB *rcvframe(int sockfd, QTYPE *q){
 	MESGB *cur;
-	MESGB c[10];
+	MESGB c[RXQSIZE];
 	int byte_recv = recvfrom(sockfd, c, sizeof(MESGB), 0, (struct sockaddr*)&cli_addr, &clilen);
 	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
 		exit(-2);
 	}
 /////////////////////////////////////
-	
+
 	// cek struktur frame
-	
+
 	if (c[0].soh != SOH || c[0].stx != STX || c[0].etx != ETX || c[0].msgno != msgno) {
 		printf("kirim NAK\n");
 		exit(-3);
 	}
-	
+
 	// cek checksum
-	
+
 	unsigned char checksumarr[5];
 	checksumarr[0] = c[0].soh;
 	checksumarr[1] = c[0].stx;
 	checksumarr[2] = c[0].etx;
 	checksumarr[3] = c[0].msgno;
 	checksumarr[4] = c[0].data[0];
-	unsigned int checksum = crc32(&checksumarr);
+	unsigned int checksum = crc32a(&checksumarr);
 	if (checksum != c[0].checksum) {
 		printf("kirim NAK\n");
 		exit(-4);
 	}
 
 	// succeed, sendto(transmitter, ACK);
-	
+
 	int send_ack = sendto(sockfd, ACK, sizeof(ACK), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){ //error sending ACK character
 		printf("Error send ACK: %d", send_ack);

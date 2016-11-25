@@ -12,19 +12,104 @@
 #include <limits.h>
 #include <stdio.h>
 #include <pthread.h>
+#include <sys/time.h>
 #include "dcomm.h"
 #include "support.h"
 using namespace std;
 
-bool xoff = false;
-char receiverAddress[MAXLEN];
+//build a socket
 struct sockaddr_in serv_addr, cli_addr;
 socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
+char receiverAddress[MAXLEN];
 int sockfd;
-bool done = false;
+int NAKnum = -1;
+
+//buffer to sendto and recvfrom
 char c_recvfrom[MAXLEN << 1], c_sendto[MAXLEN << 1];
-Byte cc[RXQSIZE];
+
+MESGB mesg;
+
+//flow control protocol
+bool xoff = false;
+bool done = false;
+
+//sliding window protocol
+Byte cc[RXQSIZE][MAXLEN + 10]; //size of buffer in chunks
 Byte lastacked = RXQSIZE - 1, lastsent = 0, countBuf = 0;
+
+bool corruptACK(char* s);
+void createSocket(char* addr, char* port);
+void initMESGB();
+void initTimeOut();
+void convMESGBtostr(MESGB m);
+
+/* Child process, receiving XON/XOFF signal from receiver*/
+void *childProcess(void *threadid);
+
+int main(int argc, char *argv[]){
+	/* Create socket */
+	if(argc != 4){
+		printf("Number of arguments should be 4!");
+		exit(-1);
+	}
+	createSocket(argv[1], argv[2]);
+	initMESGB();
+	initTimeOut();
+
+	/* Create child process for receiving data*/
+	pthread_t child_thread;
+	int rc = pthread_create(&child_thread, NULL, childProcess, 0);
+	if(rc){ //failed creating thread
+		printf("Error:unable to create thread %d\n", rc);
+		exit(-1);
+	}
+
+	// reading from file
+	FILE* myfile = fopen(argv[3], "r");
+	int idx = 0;
+
+	/* Parent send data */
+	while (!feof(myfile) || lastacked < lastsent){
+		if(!xoff && NAKnum == -1 && countBuf < 10){
+			fgets(cc[(lastsent + 1) % RXQSIZE], MAXLEN, myfile); //read MAXLEN character from file
+			lastsent = (lastsent + 1) % RXQSIZE;
+			countBuf = lastsent - lastacked;
+
+			//set dataformat to mesg
+			mesg.msgno = idx % RXQSIZE;
+			mesg.data = cc[idx % RXQSIZE];
+			string s = convMESGBtostr(mesg);
+
+			memset(c_sendto, 0, sizeof c_sendto);
+			strcpy(c_sendto, s.c_str());
+
+			idx++;
+			printf("Mengirim frame ke-%d: \'%s\' \n", idx, cc[(lastsent + 1) % RXQSIZE]);
+			sendto(sockfd, &c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
+			usleep(5000);
+		}
+		else if(xoff && NAKnum == -1){ // XOFF sent, receive buffer is above minimum upperlimit
+			printf("Menunggu XON...\n");
+			usleep(200000);
+		}
+		else{ //NAKnum != -1
+			mesg.msgno = NAKnum;
+			mesg.data = cc[NAKnum % RXQSIZE];
+			string s = convMESGBtostr(mesg);
+
+			memset(c_sendto, 0, sizeof c_sendto);
+			strcpy(c_sendto, s.c_str());
+			printf("Mengirim frame ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
+			sendto(sockfd, &c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
+			usleep(5000);
+			NAKnum = -1;
+		}
+	}
+	done = true;
+	// reach end of file
+	fclose(myfile);
+	exit(0);
+}
 
 bool corruptACK(char* s){
 	int i = 0;
@@ -42,7 +127,7 @@ bool corruptACK(char* s){
 		}
 		else if(i == 1){
 			ss += s[i];
-			unsigned char ta[MAXLEN];
+			unsigned char ta[MAXLEN << 1];
 			strcpy( (char*) ta, ss.c_str());
 			checksum = crc32a(ta);
 		}
@@ -54,21 +139,40 @@ bool corruptACK(char* s){
 	}
 	return checksum != real_c;
 }
+void createSocket(char* addr, char* port){
+	//define a client socket
+	serv_addr.sin_family = AF_INET;
+   	serv_addr.sin_addr.s_addr = inet_addr(addr);
+   	serv_addr.sin_port = htons(atoi(port));
 
-/* Child process, receiving XON/XOFF signal from receiver*/
+   	inet_ntop(AF_INET, &serv_addr.sin_addr, receiverAddress, sizeof (receiverAddress));
+
+	printf("Membuat socket untuk koneksi ke %s:%d ...\n", receiverAddress, htons(serv_addr.sin_port));
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+}
+void initMESGB(){
+	mesg.soh = SOH;
+	mesg.stx = STX;
+	mesg.etx = ETX;
+}
+void initTimeOut(){
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = 200000;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+		perror("Error");
+	}
+}
 void *childProcess(void *threadid){
+
 	int now = 0;
-	struct timespec t_per_recv;
-	t_per_recv.tv_sec = 0;
-	t_per_recv.tv_nsec = 100000000;
-
 	while(!done){
-		// child receieve xon/xoff signal
 		memset(c_recvfrom, 0,sizeof c_recvfrom);
-		int rc = recvfrom(sockfd, c_recvfrom, sizeof(c_recvfrom), 0, (struct sockaddr*) &serv_addr, &serv_len);
 
+		int rc = recvfrom(sockfd, c_recvfrom, sizeof(c_recvfrom), 0, (struct sockaddr*) &serv_addr, &serv_len);
 		if(rc < 0){
-			printf("Error receiving byte: %d", rc);
+			printf("Timeout!\n");
+			NAKnum = (lastacked + 1) % RXQSIZE;
 			exit(-2);
 		}
 		if(c_recvfrom[0] == XON){
@@ -80,7 +184,6 @@ void *childProcess(void *threadid){
 			xoff = true;
 		}
 		else{
-			//ngecek checksum dulu
 			if(!corruptACK(c_recvfrom)){
 				//dia nerima ACK / NAK
 				if(c_recvfrom[0] == ACK){
@@ -93,88 +196,24 @@ void *childProcess(void *threadid){
 					}
 				}
 				else{
-					MESGB mesg;
-					mesg.soh = SOH;
-					mesg.stx = STX;
-					mesg.etx = ETX;
-					mesg.msgno = c_recvfrom[1];
-					mesg.data = &cc[c_recvfrom[1]];
-					string s = (char)mesg.soh + (char)mesg.msgno + (char)mesg.stx + (char*)mesg.data + (char)mesg.etx;
-					unsigned char t[MAXLEN];
-					strcpy( (char*) t, s.c_str());
-					mesg.checksum = crc32a(t);
-					s += to_string(mesg.checksum);
-					strcpy(c_sendto, s.c_str());
-					sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
-					memset(c_sendto, 0, sizeof c_sendto);
+					NAK = c_recvfrom[1];
 				}
 			}
 		}
 	}
 }
 
-int main(int argc, char *argv[]){
+void convMESGBtostr(MESGB m){
+	String ret = "";
+	ret += m.soh;
+	ret += m.msgno;
+	ret += m.stx;
+	ret += m.data;
+	ret += m.etx;
 
-	/* Create socket */
-
-	//define a client socket
-	serv_addr.sin_family = AF_INET;
-   	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
-   	serv_addr.sin_port = htons(atoi(argv[2]));
-
-   	inet_ntop(AF_INET, &serv_addr.sin_addr, receiverAddress, sizeof (receiverAddress));
-
-	printf("Membuat socket untuk koneksi ke %s:%d ...\n", receiverAddress, htons(serv_addr.sin_port));
-	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-
-	/* Create child process */
-
-	pthread_t child_thread;
-
-	int rc = pthread_create(&child_thread, NULL, childProcess, 0);
-	if(rc){ //failed creating thread
-		printf("Error:unable to create thread %d\n", rc);
-        exit(-1);
-	}
-	/* Parent send data */
-
-	int idx = 0;
-	FILE* myfile = fopen(argv[3], "r");
-	// reading from file
-	while (!feof(myfile)){
-		if(!xoff){
-			fscanf(myfile, "%c", &cc[(lastsent + 1) % RXQSIZE]);
-			lastsent = (lastsent + 1) % RXQSIZE;
-
-
-			MESGB mesg;
-			mesg.soh = SOH;
-			mesg.stx = STX;
-			mesg.etx = ETX;
-			mesg.msgno = idx;
-			mesg.data = &cc[idx % RXQSIZE];
-			string s = (char)mesg.soh + (char)mesg.msgno + (char)mesg.stx + (char*)mesg.data + (char)mesg.etx;
-			unsigned char t[MAXLEN];
-			strcpy( (char*) t, s.c_str());
-			mesg.checksum = crc32a(t);
-			s += to_string(mesg.checksum);
-			strcpy(c_sendto, s.c_str());
-
-			// send character from file to socket
-			idx++;
-			printf("Mengirim byte ke-%d: \'%c\' \n", idx, cc[(lastsent + 1) % RXQSIZE]);
-
-			sendto(sockfd, &c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
-			memset(c_sendto, 0, sizeof c_sendto);
-			usleep(100000);
-		}
-		else{ // XOFF sent, receive buffer is above minimum upperlimit
-			printf("Menunggu XON...\n");
-			sleep(2);
-		}
-	}
-
-	// reach end of file
-	fclose(myfile);
-	exit(0);
+	unsigned char t[MAXLEN << 1]; //for checksum
+	strcpy( (char*) t, ret.c_str());
+	m.checksum = crc32a(t);
+	ret += to_string(m.checksum);
+	return ret;
 }

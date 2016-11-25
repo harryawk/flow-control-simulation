@@ -25,7 +25,7 @@
 #define BYTESIZE	256 /* The maximum value of a byte */
 #define MAXLEN		1024/* Maximum messages length */
 
-/* Define receive buffer size */
+ /* Define receive buffer size */
 #define RXQSIZE 16
 
 typedef unsigned char Byte;

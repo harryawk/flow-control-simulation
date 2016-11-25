@@ -1,7 +1,6 @@
 #ifndef SUPPORT_H
 #define SUPPORT_H
 unsigned reverse(unsigned x);
-
 unsigned int crc32a(unsigned char *message);
 
 /*
@@ -15,7 +14,6 @@ unsigned reverse(unsigned x) {   x = ((x & 0x55555555) <<  1) | ((x >>  1) & 0x5
        ((x >> 8) & 0xFF00) | (x >> 24);
    return x;
 }
-
 unsigned int crc32a(unsigned char *message) {
    int i, j;
    unsigned int byte, crc;
