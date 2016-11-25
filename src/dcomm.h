@@ -51,7 +51,7 @@ typedef struct MESGB
 typedef struct RESP{
  	Byte res;
 	Byte msgno;
-	int checksum;
+	unsigned int checksum;
 } RESP;
 
 #endif

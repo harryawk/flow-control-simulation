@@ -34,14 +34,14 @@ bool xoff = false;
 bool done = false;
 
 //sliding window protocol
-Byte cc[RXQSIZE][MAXLEN + 10]; //size of buffer in chunks
+char cc[RXQSIZE][MAXLEN + 10]; //size of buffer in chunks
 Byte lastacked = RXQSIZE - 1, lastsent = 0, countBuf = 0;
 
 bool corruptACK(char* s);
 void createSocket(char* addr, char* port);
 void initMESGB();
 void initTimeOut();
-void convMESGBtostr(MESGB m);
+string convMESGBtostr(MESGB m);
 
 /* Child process, receiving XON/XOFF signal from receiver*/
 void *childProcess(void *threadid);
@@ -70,14 +70,14 @@ int main(int argc, char *argv[]){
 
 	/* Parent send data */
 	while (!feof(myfile) || lastacked < lastsent){
-		if(!xoff && NAKnum == -1 && countBuf < 10){
+		if(!xoff && NAKnum == -1 && countBuf < 13){
 			fgets(cc[(lastsent + 1) % RXQSIZE], MAXLEN, myfile); //read MAXLEN character from file
 			lastsent = (lastsent + 1) % RXQSIZE;
 			countBuf = lastsent - lastacked;
 
 			//set dataformat to mesg
 			mesg.msgno = idx % RXQSIZE;
-			mesg.data = cc[idx % RXQSIZE];
+			mesg.data = (Byte*)cc[idx % RXQSIZE];
 			string s = convMESGBtostr(mesg);
 
 			memset(c_sendto, 0, sizeof c_sendto);
@@ -90,11 +90,11 @@ int main(int argc, char *argv[]){
 		}
 		else if(xoff && NAKnum == -1){ // XOFF sent, receive buffer is above minimum upperlimit
 			printf("Menunggu XON...\n");
-			usleep(200000);
+			usleep(20000);
 		}
 		else{ //NAKnum != -1
 			mesg.msgno = NAKnum;
-			mesg.data = cc[NAKnum % RXQSIZE];
+			mesg.data = (Byte*)cc[NAKnum % RXQSIZE];
 			string s = convMESGBtostr(mesg);
 
 			memset(c_sendto, 0, sizeof c_sendto);
@@ -173,7 +173,6 @@ void *childProcess(void *threadid){
 		if(rc < 0){
 			printf("Timeout!\n");
 			NAKnum = (lastacked + 1) % RXQSIZE;
-			exit(-2);
 		}
 		if(c_recvfrom[0] == XON){
 			printf("XON diterima.\n");
@@ -187,6 +186,7 @@ void *childProcess(void *threadid){
 			if(!corruptACK(c_recvfrom)){
 				//dia nerima ACK / NAK
 				if(c_recvfrom[0] == ACK){
+					printf("ACK %d\n", c_recvfrom[1]);
 					lastacked = c_recvfrom[1];
 					if(lastacked <= lastsent){
 						countBuf = lastsent - lastacked;
@@ -196,19 +196,19 @@ void *childProcess(void *threadid){
 					}
 				}
 				else{
-					NAK = c_recvfrom[1];
+					NAKnum = c_recvfrom[1];
+					printf("ACK %d\n", NAKnum);
 				}
 			}
 		}
 	}
 }
-
-void convMESGBtostr(MESGB m){
-	String ret = "";
+string convMESGBtostr(MESGB m){
+	string ret = "";
 	ret += m.soh;
 	ret += m.msgno;
 	ret += m.stx;
-	ret += m.data;
+	ret += (char*)m.data;
 	ret += m.etx;
 
 	unsigned char t[MAXLEN << 1]; //for checksum

@@ -1,5 +1,5 @@
 /*
- * File : T1_rx.cpp
+ * File : receiver.cpp
  */
 #include "dcomm.h"
 #include "support.h"
@@ -12,88 +12,61 @@
 #include <sys/socket.h>
 #include <strings.h>
 #include <string.h>
+#include <string>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <limits.h>
 #include <stdio.h>
 #include <pthread.h>
 #include "support.h"
+using namespace std;
 
 /* Delay to adjust speed of consuming buffer, in milliseconds */
-#define DELAY 500
-
+#define DELAY 20
 /* Define receive buffer size */
 #define RXQSIZE 16
-#define WINDOWSIZE 6
+#define WINDOWSIZE 10
 
-int window[WINDOWSIZE];
+#define fi first
+#define se second
+
+/////////////////////////////////////////////////////////////////
 int msgno = 0;
-
-MESGB messages[RXQSIZE];
-
+/* for sliding window protocol and selective-repeat ARQ */
 Byte rxbuf[RXQSIZE];
-char clientName[1000];
+Byte msg[RXQSIZE][MAXLEN + 10];
+char clientName[MAXLEN];
+char recvbuf[MAXLEN << 1], sendbuf[MAXLEN << 1];
+
 QTYPE rcvq = { 0, 0, 0, RXQSIZE, rxbuf };
 QTYPE *rxq = &rcvq;
+
+/* for send xon and xoff */
+char sendxonxoff = XON;
 bool send_xon = false, send_xoff = false;
+int lastrecv = 0, lastacked = 0;
 
 /* Socket */
 int sockfd; //listen on sock_fd
-
-char kirimXOFF[10];
-char kirimXON[10];
+void createSocket(char* addr, char* port);
 
 /* Functions declaration */
-static Byte *rcvchar(int, QTYPE *);
-static Byte *q_get(QTYPE *);
-static MESGB *rcvframe(int sockfd, QTYPE *q);
+static Byte* q_get(QTYPE *);
+static int rcvframe(int sockfd, QTYPE *q);
+pair<int, string> convbuf(char* c);
+string convRESPtostr(int res, int msgno);
 
 struct sockaddr_in serv_addr, cli_addr;
 socklen_t addrlen = sizeof(serv_addr), clilen = sizeof(cli_addr);
-int byte_idx = 0;
 
 /* Child process, read character from buffer */
-void *childProcess(void *threadid){
-	int byte_now = 0;
-
-	while(true){
-		Byte *now;
-		now = q_get(rxq);
-		if(now != NULL){
-			printf("Mengkonsumsi byte ke-%d: '%c'\n", ++byte_now, *now);
-			usleep(DELAY * 1000);
-		}
-	}
-	pthread_exit(NULL);
-}
-
+void *childProcess(void *threadid);
+void sendACK(int framenum);
+void sendNAK(int framenum);
 // SERVER PROGRAM
 int main(int argc, char *argv[]){
-	// Byte c;
-	MESGB c;
 	// create socket
-	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-
-	// initialize server address
-	kirimXOFF[0] = (char) XOFF;
-	kirimXOFF[1] = '\0';
-	kirimXON[0] = (char) XON;
-	kirimXON[1] = '\0';
-   	serv_addr.sin_family = AF_INET;
-   	serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
-   	if (argc > 2) {
-   		serv_addr.sin_port = htons(atoi(argv[2]));
-   	} else {
-   		serv_addr.sin_port = htons(13514);
-   	}
-
-	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) { //binding error
-   		perror("ERROR : on binding");
-   		exit(1);
-   	}
-   	// if get out of here : serversock binded
-	inet_ntop(AF_INET, &serv_addr.sin_addr, clientName, sizeof (clientName));
-	printf("Binding pada %s:%d\n", clientName, ntohs(serv_addr.sin_port));
+	createSocket(argv[1], argv[2]);
 
 	/* Initialize XON/XOFF flags */
 	send_xon = true;
@@ -101,74 +74,29 @@ int main(int argc, char *argv[]){
 
 	/* Create child process */
 	pthread_t child_thread;
-	// (void *)
 	int rc = pthread_create(&child_thread, NULL, childProcess, (void *)0);
 	if(rc){ //failed creating thread
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
+
 	/*** IF PARENT PROCESS ***/
 	while(true){
-		// c = *(rcvchar(sockfd, rxq));
-		c = *(rcvframe(sockfd, rxq));
-		msgno++;
-		// Quit on end of file
-		if(c.data[0] == Endfile){
-			exit(0);
-		}
+		int ret = rcvframe(sockfd, rxq);
 	}
+
 	pthread_join(child_thread, NULL);
 	pthread_exit(NULL);
 	return 0;
 }
 
 /* function for reading character and put it to the receive buffer*/
-static Byte *rcvchar(int sockfd, QTYPE *q){
-
-	Byte *cur;
-	char c[10];
-	// MESGB c;
-	int byte_recv = recvfrom(sockfd, c, 1, 0, (struct sockaddr*)&cli_addr, &clilen);
-	if(byte_recv < 0){ //error receiving character
-		printf("Error receiving: %d", byte_recv);
-		exit(-2);
-	}
-/////////////////////////////////////
-	// cek struktur frame
-
-	// cek checksum
-
-	// succeed, sendto(transmitter, ACK);
-
-////////////////////////////////////
-	// succeed reading character
-	q->count++;
-	q->data[q->rear] = c[0];
-	cur = &(q->data[q->rear]);
-	q->rear++;
-	if(q->rear == RXQSIZE) {
-		q->rear = 0;
-	}
-
-	printf("Menerima byte ke-%d.\n", ++byte_idx);
-
-	// receive buffer above minimum upperlimit
-	// sending XOFF
-	if(q->count >= 8 && !send_xoff){
-		send_xoff = true;
-		send_xon = false;
-		printf("Buffer > minimum upperlimit.\n");
-		printf("Mengirim XOFF\n");
-		sendto(sockfd, kirimXOFF, 1, 0, (struct sockaddr*)&cli_addr, clilen);
-	}
-	return cur;
-}
 
 /* q_get returns a pointer to the buffer where data is read
  * or NULL if buffer is empty
  */
-static Byte *q_get(QTYPE *q){
-	Byte *current;
+static Byte* q_get(QTYPE *q){
+	Byte* current;
 	/* Nothing in the queue */
 	if(!q->count) return (NULL);
 	(q->count)--;
@@ -179,14 +107,13 @@ static Byte *q_get(QTYPE *q){
 		q->front = 0;
 	}
 
-	// receive buffer below maximum lowerlimit
-	// sending XON
 	if(q->count < 4 && !send_xon){
 		send_xon = true;
 		send_xoff = false;
+		sendxonxoff = XON;
 		printf("Buffer < maximum lowerlimit.\n");
 		printf("Mengirim XON\n");
-		int x = sendto(sockfd, (char*)&kirimXON, 1, 0, (struct sockaddr*)&cli_addr , clilen);
+		int x = sendto(sockfd, &sendxonxoff, 1, 0, (struct sockaddr*)&cli_addr , clilen);
 		if (x < 0) {
 			printf("error: wrong socket\n");
 			exit(-3);
@@ -195,67 +122,163 @@ static Byte *q_get(QTYPE *q){
 	return current;
 }
 
-static MESGB *rcvframe(int sockfd, QTYPE *q){
-	MESGB *cur;
-	MESGB c[RXQSIZE];
-	int byte_recv = recvfrom(sockfd, c, sizeof(MESGB), 0, (struct sockaddr*)&cli_addr, &clilen);
+static int rcvframe(int sockfd, QTYPE *q){
+	memset(recvbuf, 0, sizeof recvbuf);
+	int byte_recv = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&cli_addr, &clilen);
 	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
-		exit(-2);
 	}
-/////////////////////////////////////
+	pair<int,string> M = convbuf(recvbuf);
+	if(M.se != ""){ // dia ga error
+		printf("Menerima frame ke-%d.\n", M.fi);
+		// receive buffer above minimum upperlimit
+		// sending XOFF
 
-	// cek struktur frame
+		//bagi 2, apakah dia ada di depan lastacked apa dibelakang lastacked.
+		//intinya bagi duanya itu buat mau diabaikan apa diterima
+		if(M.fi <= q->rear){
+			if(M.fi >= q->front){
+				strcpy((char*)msg[M.fi], M.se.c_str());
+			}
+			else if(q->front > q->rear){
+				strcpy((char*)msg[M.fi], M.se.c_str());
+			}
+			else{
+				//bagi dua lagi, apakah ada didalem batas apa nggak, ini ditulis soalnya bisa aja dia sebenernya lanjutannya tapi udah muter
+				if((M.fi + 1) + RXQSIZE - q->front < WINDOWSIZE){
+					q->count = M.fi + 1 + RXQSIZE - q->front;
+					q->rear = M.fi;
+					strcpy((char*)msg[q->rear], M.se.c_str());
+					lastrecv = q->rear;
+				}
+				else {
+					//do nothing!
+				}
+			}
+		}
+		else{
+			if(q->front > q->rear){
+				//bagi dua lagi, lewat bates apa nggak
+				if(M.fi + 1 + RXQSIZE - q->front < WINDOWSIZE + 3){
+					q->count = M.fi + 1 + RXQSIZE - q->front;
+					q->rear = M.fi;
+					strcpy((char*)msg[q->rear], M.se.c_str());
+					lastrecv = q->rear;
+				}
+			}
+			else{
+				//bagi dua lagi, lewat bates apa nggak
+				if(M.fi - q->front + 1 < WINDOWSIZE + 3){
+					q->count = M.fi - q->front + 1;
+					q->rear = M.fi;
+					strcpy((char*)msg[q->rear], M.se.c_str());
+					lastrecv = q->rear;
+				}
+			}
+		}
 
-	if (c[0].soh != SOH || c[0].stx != STX || c[0].etx != ETX || c[0].msgno != msgno) {
-		printf("kirim NAK header\n");
-		exit(-3);
+		if(q->count >= WINDOWSIZE){
+			sendxonxoff = XOFF;
+			send_xoff = true;
+			send_xon = false;
+			printf("Buffer > minimum upperlimit.\n");
+			printf("Mengirim XOFF\n");
+			sendto(sockfd, &sendxonxoff, 1, 0, (struct sockaddr*)&cli_addr, clilen);
+		}
 	}
-
-	// cek checksum
-
-	unsigned char checksumarr[5];
-	checksumarr[0] = c[0].soh;
-	checksumarr[1] = c[0].stx;
-	checksumarr[2] = c[0].etx;
-	checksumarr[3] = c[0].msgno;
-	checksumarr[4] = *(c[0].data);
-	unsigned int checksum = crc32a(checksumarr); //ini harus dibetulin soalnya lebih dari 1 karakter
-	if (checksum != c[0].checksum) {
-		printf("kirim NAK checksumarr\n");
-		exit(-4);
+	else{
+		sendNAK(q->front);
 	}
+	return M.fi;
+}
 
-	// succeed, sendto(transmitter, ACK);
+void createSocket(char* addr, char* port){
+	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-	int* ack_table;
-	ack_table[0] = ACK;
-	int send_ack = sendto(sockfd, ack_table, sizeof(ACK), 0, (struct sockaddr*)&cli_addr, clilen);
-	if(send_ack < 0){ //error sending ACK character
+	// initialize server address
+   	serv_addr.sin_family = AF_INET;
+   	serv_addr.sin_addr.s_addr = inet_addr(addr);
+   	serv_addr.sin_port = htons(atoi(port));
+
+	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) { //binding error
+   		perror("ERROR : on binding");
+   		exit(1);
+   	}
+   	// if get out of here : serversock binded
+	inet_ntop(AF_INET, &serv_addr.sin_addr, clientName, sizeof (clientName));
+	printf("Binding pada %s:%d\n", clientName, ntohs(serv_addr.sin_port));
+}
+
+pair<int, string> convbuf(char* buf){
+	pair<int,string> res = make_pair(-1,"");
+	if(buf[0] != SOH) return res;
+	if(buf[2] != STX) return res;
+	res.fi = buf[1];
+	int idx = 0;
+	res.se += buf[0] + buf[1] + buf[2];
+	for(idx = 3;buf[idx] != ETX && idx < MAXLEN + 15; ++idx){
+		res.se += buf[idx];
+	}
+	res.se += buf[idx];
+	++idx;
+	unsigned int check = 0;
+	while(buf[idx] != 0){
+		check *= 10;
+		check += buf[idx] - '0';
+	}
+	unsigned char t[MAXLEN << 1]; //for checksum
+	strcpy( (char*) t, (res.se).c_str());
+	unsigned int checksum = crc32a(t);
+	if(checksum != check) return make_pair(-1, "");
+	return res;
+}
+
+string convRESPtostr(int res, int msgno){
+	RESP R;
+	R.res = res;
+	R.msgno = msgno;
+	unsigned char* uc = new unsigned char[3];
+	uc[0] = R.res;
+	uc[1] = R.msgno;
+	R.checksum = crc32a(uc);
+	memset(sendbuf, 0, sizeof sendbuf);
+	string s = "";
+	s += (char)R.res;
+	s += (char)R.msgno;
+	s += to_string(R.checksum);
+	strcpy(sendbuf, s.c_str());
+}
+
+void *childProcess(void *threadid){
+	int byte_now = 0;
+	while(true){
+		Byte* now;
+		//ini masih harus diubah lagi, melihat dia getnya ga berurutan
+		now = q_get(rxq);
+		if(now != NULL){
+			printf("Mengkonsumsi byte ke-%d.\n", ++byte_now);
+			sendACK(*now);
+			usleep(DELAY * 1000);
+		}
+		else{
+			sendNAK(rxq->front);
+		}
+	}
+	pthread_exit(NULL);
+}
+
+void sendACK(int framenum){
+	string s = convRESPtostr(ACK, framenum);
+	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
+	if(send_ack < 0){//error sending ACK character
 		printf("Error send ACK: %d", send_ack);
-		exit(-2);
 	}
-////////////////////////////////////
-	// succeed reading character
-////////////////////////////////////
-	q->count++;
-	q->data[q->rear] = *(c[0].data);
-	cur->data = &(q->data[q->rear]);
-	q->rear++;
-	if(q->rear == RXQSIZE) {
-		q->rear = 0;
-	}
+}
 
-	printf("Menerima frame ke-%d.\n", ++byte_idx);
-
-	// receive buffer above minimum upperlimit
-	// sending XOFF
-	if(q->count >= 8 && !send_xoff){
-		send_xoff = true;
-		send_xon = false;
-		printf("Buffer > minimum upperlimit.\n");
-		printf("Mengirim XOFF\n");
-		sendto(sockfd, kirimXOFF, 1, 0, (struct sockaddr*)&cli_addr, clilen);
+void sendNAK(int framenum){
+	string s = convRESPtostr(NAK, framenum);
+	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
+	if(send_ack < 0){//error sending ACK character
+		printf("Error send NAK: %d", send_ack);
 	}
-	return cur;
 }
