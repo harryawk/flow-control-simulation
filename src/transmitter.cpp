@@ -83,8 +83,8 @@ int main(int argc, char *argv[]){
 			memset(c_sendto, 0, sizeof c_sendto);
 			strcpy(c_sendto, s.c_str());
 
+			printf("Mengirim frame ke-%d: \'%s\' \n", idx, cc[lastsent]);
 			idx++;
-			printf("Mengirim frame ke-%d: \'%s\' \n", idx, cc[(lastsent + 1) % RXQSIZE]);
 			sendto(sockfd, &c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
 			usleep(5000);
 		}
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]){
 
 			memset(c_sendto, 0, sizeof c_sendto);
 			strcpy(c_sendto, s.c_str());
-			printf("Mengirim frame ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
+			printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
 			sendto(sockfd, &c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
 			usleep(5000);
 			NAKnum = -1;

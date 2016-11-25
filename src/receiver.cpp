@@ -80,7 +80,7 @@ int main(int argc, char *argv[]){
 		printf("Error:unable to create thread %d\n", rc);
         exit(-1);
 	}
-	
+
 	/*** IF PARENT PROCESS ***/
 	while(true){
 		int ret = rcvframe(sockfd, rxq);
@@ -258,14 +258,18 @@ void *childProcess(void *threadid){
 		Byte* now;
 		//ini masih harus diubah lagi, melihat dia getnya ga berurutan
 		now = q_get(rxq);
+
 		if(now != NULL){
+
 			printf("Mengkonsumsi byte ke-%d.\n", ++byte_now);
 			sendACK(*now);
 			usleep(DELAY * 1000);
 		}
 		else{
+			printf("ANAK PIPIN :3\n");
 			if(rxq->count != 0){
 				sendNAK(rxq->front);
+				sleep(2);
 			}
 		}
 	}
