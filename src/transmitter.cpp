@@ -83,7 +83,7 @@ int main(int argc, char *argv[]){
 			mesg.msgno = idx % RXQSIZE;
 			printf("\nmesg.msgno : %d ----\n", mesg.msgno);
 			mesg.data = (Byte*)cc[idx % RXQSIZE];
-			printf("\nmesg.data : %s ----\n", mesg.data);
+			printf("\nmesg.data : %s ----\n", (char*)mesg.data);
 			string s = convMESGBtostr(mesg);
 
 			memset(c_sendto, 0, sizeof c_sendto);
