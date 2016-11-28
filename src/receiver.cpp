@@ -153,7 +153,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
 					strcpy((char*)msg[q->rear], M.se.c_str());
-					lastrecv = q->rear;	
+					lastrecv = q->rear;
 				}
 				else {
 					//do nothing!
@@ -267,7 +267,6 @@ void *childProcess(void *threadid){
 		now = q_get(rxq);
 
 		if(now != NULL){
-
 			printf("Mengkonsumsi byte ke-%d.\n", ++byte_now);
 			sendACK(*now);
 			usleep(DELAY * 1000);
@@ -290,7 +289,6 @@ void sendACK(int framenum){
 		printf("Error send ACK: %d", send_ack);
 	}
 }
-
 void sendNAK(int framenum){
 	string s = convRESPtostr(NAK, framenum);
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
