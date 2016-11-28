@@ -125,13 +125,14 @@ static Byte* q_get(QTYPE *q){
 
 static int rcvframe(int sockfd, QTYPE *q){
 	memset(recvbuf, 0, sizeof recvbuf);
-	puts("Pi*pin Masuk");
+	puts("Pi*pin Masuk recvframe");
 	int byte_recv = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&cli_addr, &clilen);
-	puts("Pi*pin Keluar");
+	puts("Pi*pin Keluar recvframe");
 	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
 	}
 	pair<int,string> M = convbuf(recvbuf);
+	printf("M.first dari convbuf(recvbuf): %d\n", M.first);
 	if(M.se != ""){ // dia ga error
 		printf("Menerima frame ke-%d.\n", M.fi);
 		// receive buffer above minimum upperlimit
@@ -152,7 +153,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
 					strcpy((char*)msg[q->rear], M.se.c_str());
-					lastrecv = q->rear;
+					lastrecv = q->rear;	
 				}
 				else {
 					//do nothing!
@@ -195,7 +196,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 	return M.fi;
 }
 
-void createSocket(char* addr, char* port){
+void createSocket(char* addr, char* port) {
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	// initialize server address
@@ -207,13 +208,16 @@ void createSocket(char* addr, char* port){
    		perror("ERROR : on binding");
    		exit(1);
    	}
+   	// printf("%s\n", serv_addr.sin_addr.s_addr);
    	// if get out of here : serversock binded
 	inet_ntop(AF_INET, &serv_addr.sin_addr, clientName, sizeof (clientName));
+   	printf("%s\n", clientName);
 	printf("Binding pada %s:%d\n", clientName, ntohs(serv_addr.sin_port));
 }
 
 pair<int, string> convbuf(char* buf){
 	pair<int,string> res = make_pair(-1,"");
+	printf("STX dari transmitter : %u\n", buf[2]);
 	if(buf[0] != SOH) return res;
 	if(buf[2] != STX) return res;
 	res.fi = buf[1];
@@ -232,6 +236,9 @@ pair<int, string> convbuf(char* buf){
 	unsigned char t[MAXLEN << 1]; //for checksum
 	strcpy( (char*) t, (res.se).c_str());
 	unsigned int checksum = crc32a(t);
+	//////////debug checksum. status : belum lewat///////////////////////
+	printf("%d\n", check);
+	printf("%d\n", checksum);
 	if(checksum != check) return make_pair(-1, "");
 	return res;
 }
@@ -266,7 +273,7 @@ void *childProcess(void *threadid){
 			usleep(DELAY * 1000);
 		}
 		else{
-			printf("ANAK PIPIN :3\n");
+			// printf("ANAK PIPIN :3\n");
 			if(rxq->count != 0){
 				sendNAK(rxq->front);
 				sleep(2);

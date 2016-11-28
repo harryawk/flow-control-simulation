@@ -54,6 +54,7 @@ int main(int argc, char *argv[]){
 	}
 	createSocket(argv[1], argv[2]);
 	initMESGB();
+	printf("\nmesg.stx : %d ----\n", mesg.stx);
 	initTimeOut();
 
 	/* Create child process for receiving data*/
@@ -76,8 +77,13 @@ int main(int argc, char *argv[]){
 			countBuf = lastsent - lastacked;
 
 			//set dataformat to mesg
+			printf("\nmesg.soh : %d ----\n", mesg.soh);
+			printf("\nmesg.stx : %d ----\n", mesg.stx);
+			printf("\nmesg.etx : %d ----\n", mesg.etx);
 			mesg.msgno = idx % RXQSIZE;
+			printf("\nmesg.msgno : %d ----\n", mesg.msgno);
 			mesg.data = (Byte*)cc[idx % RXQSIZE];
+			printf("\nmesg.data : %s ----\n", mesg.data);
 			string s = convMESGBtostr(mesg);
 
 			memset(c_sendto, 0, sizeof c_sendto);
@@ -99,7 +105,7 @@ int main(int argc, char *argv[]){
 
 			memset(c_sendto, 0, sizeof c_sendto);
 			strcpy(c_sendto, s.c_str());
-			printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
+			// printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
 			sendto(sockfd, &c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
 			usleep(5000);
 			NAKnum = -1;
@@ -168,7 +174,6 @@ void *childProcess(void *threadid){
 	int now = 0;
 	while(!done){
 		memset(c_recvfrom, 0,sizeof c_recvfrom);
-
 		int rc = recvfrom(sockfd, c_recvfrom, sizeof(c_recvfrom), 0, (struct sockaddr*) &serv_addr, &serv_len);
 		if(rc < 0){
 			printf("Timeout!\n");
@@ -215,5 +220,6 @@ string convMESGBtostr(MESGB m){
 	strcpy( (char*) t, ret.c_str());
 	m.checksum = crc32a(t);
 	ret += to_string(m.checksum);
+	printf("%u\n", m.checksum);
 	return ret;
 }
