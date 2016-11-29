@@ -71,10 +71,12 @@ int main(int argc, char *argv[]){
 
 	/* Parent send data */
 	while (!feof(myfile) || lastacked < lastsent){
+		printf("MASUK %d %d %d\n", xoff, NAKnum, countBuf);
 		if(!xoff && NAKnum == -1 && countBuf < 13){
 			fgets(cc[(lastsent + 1) % RXQSIZE], MAXLEN, myfile); //read MAXLEN character from file
 			lastsent = (lastsent + 1) % RXQSIZE;
-			countBuf = lastsent - lastacked;
+			countBuf = (lastsent - lastacked);
+			countBuf %= RXQSIZE;
 
 			//set dataformat to mesg
 			printf("\nmesg.soh : %d ----\n", mesg.soh);
@@ -138,8 +140,11 @@ bool corruptACK(char* s){
 		}
 		else if(i == 1){
 			ss += s[i];
-			unsigned char ta[MAXLEN << 1];
-			strcpy( (char*) ta, ss.c_str());
+			unsigned char ta[MAXLEN + 40];
+			memset(ta,0,sizeof ta);
+			for(int j = 0; j < ss.length(); ++j){
+				ta[j] = ss[j];
+			}
 			checksum = crc32a(ta);
 		}
 		else{
@@ -207,7 +212,7 @@ void *childProcess(void *threadid){
 				}
 				else{
 					NAKnum = c_recvfrom[1];
-					printf("ACK %d\n", NAKnum);
+					printf("NAK %d\n", NAKnum);
 				}
 			}
 		}
