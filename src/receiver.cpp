@@ -83,7 +83,9 @@ int main(int argc, char *argv[]){
 
 	/*** IF PARENT PROCESS ***/
 	while(true){
+		printf("parent thread\n");
 		int ret = rcvframe(sockfd, rxq);
+		printf("selesai parent\n");
 	}
 
 	pthread_join(child_thread, NULL);
@@ -127,7 +129,9 @@ static Byte* q_get(QTYPE *q){
 
 static int rcvframe(int sockfd, QTYPE *q){
 	memset(recvbuf, 0, sizeof recvbuf);
+	printf("masuk recvframe\n");
 	int byte_recv = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&cli_addr, &clilen);
+	// printf("%d\n", byte_recv);
 	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
 	}
@@ -195,7 +199,9 @@ static int rcvframe(int sockfd, QTYPE *q){
 		}
 	}
 	else{
+		printf("di recvframe\n");
 		sendNAK(q->front);
+		printf("di recvframe\n");
 	}
 	return M.fi;
 }
@@ -282,15 +288,21 @@ void *childProcess(void *threadid){
 
 		if(now != NULL){
 			printf("Mengkonsumsi byte ke-%d.\n", *now);
+			printf("numframe : %d\n", *now);
 			sendACK(*now);
-			usleep(DELAY * 1000);
+			printf("ack sent!\n");
+			sleep(2);
+			// usleep(DELAY * 10000000);
 			*now = 0xFF;
 		}
 		else{
 			// printf("ANAK PIPIN :3\n");
 			if(rxq->count != 0){
+				printf("di child\n");
 				sendNAK(rxq->front);
-				usleep(100000);
+				printf("before usleep\n");
+				sleep(2);
+				// usleep(100000000);
 			}
 		}
 	}
@@ -299,9 +311,10 @@ void *childProcess(void *threadid){
 
 void sendACK(int framenum){
 	string s = convRESPtostr(ACK, framenum);
-
 	memset(sendbuf, 0, sizeof sendbuf);
+	cout << s << endl;
 	for(int i = 0;i < s.length(); ++i){
+		printf("done resp conv : %d\n", s[i]);
 		sendbuf[i] = s[i];
 	}
 	printf("SEND ACK!\n");
@@ -320,7 +333,9 @@ void sendNAK(int framenum){
 	}
 	printf("SEND NAK!\n");
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
+	printf("done send nak\n");
 	if(send_ack < 0){//error sending ACK character
 		printf("Error send NAK: %d", send_ack);
 	}
+	printf("out sendNAk\n");
 }
