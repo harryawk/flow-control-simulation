@@ -172,7 +172,7 @@ static int rcvframe(QTYPE *q){
 		else{
 			if(q->front > q->rear){
 				//bagi dua lagi, lewat bates apa nggak
-				if(M.fi + 1 + RXQSIZE - q->front <= WINDOWSIZE){
+				if(M.fi < q->front && M.fi + 1 + RXQSIZE - q->front <= WINDOWSIZE){ //dia sebagai elemen baru
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
@@ -180,8 +180,13 @@ static int rcvframe(QTYPE *q){
 					lastrecv = q->rear;
 					puts("2.1.1 MASUK");
 				}
+				else if (M.fi >= q->front){
+					strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
+					q->data[M.fi] = M.fi;
+					puts("2.1.2 MASUK");
+				}
 				else{
-					puts("2.1.2 GA MASUK");
+					puts("2.1.3 GA MASUK");
 				}
 			}
 			else{
