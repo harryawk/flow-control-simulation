@@ -134,8 +134,8 @@ static int rcvframe(QTYPE *q){
 		return -1;
 	}
 	pair<int,string> M = convbuf(recvbuf);
-	printf("M.first dari convbuf(recvbuf): %d\n", M.first);
-	if(M.se != "" && M.fi != -1 && q->data[M.fi] == 0xFF){ // dia ga error
+	printf("M.first dari convbuf %d\n", M.first);
+	if(M.fi != -1 && q->data[M.fi] == 0xFF){ // dia ga error
 		printf("Menerima frame ke-%d: %s\n", M.fi, M.se.c_str());
 		// receive buffer above minimum upperlimit
 		// sending XOFF
@@ -155,7 +155,7 @@ static int rcvframe(QTYPE *q){
 			}
 			else{
 				//bagi dua lagi, apakah ada didalem batas apa nggak, ini ditulis soalnya bisa aja dia sebenernya lanjutannya tapi udah muter
-				if((M.fi + 1) + RXQSIZE - q->front < WINDOWSIZE){
+				if((M.fi + 1) + RXQSIZE - q->front <= WINDOWSIZE){
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
@@ -172,7 +172,7 @@ static int rcvframe(QTYPE *q){
 		else{
 			if(q->front > q->rear){
 				//bagi dua lagi, lewat bates apa nggak
-				if(M.fi + 1 + RXQSIZE - q->front < WINDOWSIZE + 3){
+				if(M.fi + 1 + RXQSIZE - q->front <= WINDOWSIZE){
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
@@ -186,7 +186,7 @@ static int rcvframe(QTYPE *q){
 			}
 			else{
 				//bagi dua lagi, lewat bates apa nggak
-				if(M.fi - q->front + 1 < WINDOWSIZE + 3){
+				if(M.fi - q->front + 1 <= WINDOWSIZE){
 					q->count = M.fi - q->front + 1;
 					q->rear = M.fi;
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
@@ -330,9 +330,9 @@ void sendNAK(int framenum){
 		sendbuf[i] = s[i];
 	}
 	printf("sendNAK %d\n", framenum);
-	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
-	if(send_ack < 0){//error sending ACK character
-		printf("Error send NAK: %d", send_ack);
+	int send_nak = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
+	if(send_nak < 0){//error sending ACK character
+		printf("Error send NAK: %d", send_nak);
 	}
 }
 void initRXQ(QTYPE *q){
