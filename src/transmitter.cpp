@@ -25,7 +25,7 @@ int sockfd;
 int NAKnum = -1;
 
 //buffer to sendto and recvfrom
-char c_recvfrom[MAXLEN << 1], c_sendto[MAXLEN << 1];
+char c_recvfrom[MAXLEN  + 40], c_sendto[MAXLEN + 40];
 
 MESGB mesg;
 

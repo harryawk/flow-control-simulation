@@ -36,7 +36,7 @@ int msgno = 0;
 Byte rxbuf[RXQSIZE];
 Byte msg[RXQSIZE][MAXLEN + 10];
 char clientName[MAXLEN];
-char recvbuf[MAXLEN << 1], sendbuf[MAXLEN << 1];
+char recvbuf[MAXLEN + 40], sendbuf[MAXLEN + 40];
 
 QTYPE rcvq = { 0, 0, 0, RXQSIZE, rxbuf };
 QTYPE *rxq = &rcvq;
@@ -138,7 +138,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 	pair<int,string> M = convbuf(recvbuf);
 	printf("M.first dari convbuf(recvbuf): %d\n", M.first);
 	if(M.se != ""){ // dia ga error
-		printf("Menerima frame ke-%d.\n", M.fi);
+		printf("Menerima frame ke-%d: %s.\n", M.fi, M.se.c_str());
 		// receive buffer above minimum upperlimit
 		// sending XOFF
 
@@ -226,7 +226,9 @@ pair<int, string> convbuf(char* buf){
 	if(buf[2] != STX) return res;
 	res.fi = buf[1];
 	int idx = 0;
-	res.se += buf[0] + buf[1] + buf[2];
+	res.se += buf[0];
+	res.se += buf[1];
+	res.se += buf[2];
 	for(idx = 3;buf[idx] != ETX && idx < MAXLEN + 15; ++idx){
 		res.se += buf[idx];
 	}
@@ -236,13 +238,19 @@ pair<int, string> convbuf(char* buf){
 	while(buf[idx] != 0){
 		check *= 10;
 		check += buf[idx] - '0';
+		++idx;
 	}
 	unsigned char t[MAXLEN << 1]; //for checksum
-	strcpy( (char*) t, (res.se).c_str());
+	memset(t,0,sizeof t);
+	printf("HAHAHAHA");
+	for(int i = 0;i < res.se.length(); ++i){
+		t[i] = (Byte)res.se[i];
+		printf(" %d", t[i]);
+	}
+	puts("");
 	unsigned int checksum = crc32a(t);
 	//////////debug checksum. status : belum lewat///////////////////////
-	printf("%d\n", check);
-	printf("%d\n", checksum);
+	printf("%u %u\n", checksum, check);
 	if(checksum != check) return make_pair(-1, "");
 	return res;
 }
@@ -293,6 +301,7 @@ void sendACK(int framenum){
 	for(int i = 0;i < s.length(); ++i){
 		sendbuf[i] = s[i];
 	}
+	printf("SEND ACK!\n");
 	//kayaknya ini masih ngebug
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){//error sending ACK character
@@ -306,6 +315,7 @@ void sendNAK(int framenum){
 	for(int i = 0;i < s.length(); ++i){
 		sendbuf[i] = s[i];
 	}
+	printf("SEND NAK!\n");
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){//error sending ACK character
 		printf("Error send NAK: %d", send_ack);
