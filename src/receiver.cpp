@@ -100,6 +100,8 @@ static Byte* q_get(QTYPE *q){
 	Byte* current;
 	/* Nothing in the queue */
 	if(!q->count) return (NULL);
+	if(q->data[q->front] == 0xFF) return (NULL);
+
 	(q->count)--;
 	current = &(q->data[q->front]);
 	q->front++;
@@ -125,9 +127,7 @@ static Byte* q_get(QTYPE *q){
 
 static int rcvframe(int sockfd, QTYPE *q){
 	memset(recvbuf, 0, sizeof recvbuf);
-	puts("Pi*pin Masuk recvframe");
 	int byte_recv = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&cli_addr, &clilen);
-	puts("Pi*pin Keluar recvframe");
 	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
 	}
@@ -138,7 +138,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 	pair<int,string> M = convbuf(recvbuf);
 	printf("M.first dari convbuf(recvbuf): %d\n", M.first);
 	if(M.se != ""){ // dia ga error
-		printf("Menerima frame ke-%d: %s.\n", M.fi, M.se.c_str());
+		printf("Menerima frame ke-%d: %s\n", M.fi, M.se.c_str());
 		// receive buffer above minimum upperlimit
 		// sending XOFF
 
@@ -146,17 +146,17 @@ static int rcvframe(int sockfd, QTYPE *q){
 		//intinya bagi duanya itu buat mau diabaikan apa diterima
 		if(M.fi <= q->rear){
 			if(M.fi >= q->front){
-				strcpy((char*)msg[M.fi], M.se.c_str());
+				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 			}
 			else if(q->front > q->rear){
-				strcpy((char*)msg[M.fi], M.se.c_str());
+				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 			}
 			else{
 				//bagi dua lagi, apakah ada didalem batas apa nggak, ini ditulis soalnya bisa aja dia sebenernya lanjutannya tapi udah muter
 				if((M.fi + 1) + RXQSIZE - q->front < WINDOWSIZE){
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
-					strcpy((char*)msg[q->rear], M.se.c_str());
+					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					lastrecv = q->rear;
 				}
 				else {
@@ -170,7 +170,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 				if(M.fi + 1 + RXQSIZE - q->front < WINDOWSIZE + 3){
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
-					strcpy((char*)msg[q->rear], M.se.c_str());
+					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					lastrecv = q->rear;
 				}
 			}
@@ -179,7 +179,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 				if(M.fi - q->front + 1 < WINDOWSIZE + 3){
 					q->count = M.fi - q->front + 1;
 					q->rear = M.fi;
-					strcpy((char*)msg[q->rear], M.se.c_str());
+					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					lastrecv = q->rear;
 				}
 			}
@@ -226,13 +226,15 @@ pair<int, string> convbuf(char* buf){
 	if(buf[2] != STX) return res;
 	res.fi = buf[1];
 	int idx = 0;
-	res.se += buf[0];
-	res.se += buf[1];
-	res.se += buf[2];
+	string checkstr = "";
+	checkstr += buf[0];
+	checkstr += buf[1];
+	checkstr += buf[2];
 	for(idx = 3;buf[idx] != ETX && idx < MAXLEN + 15; ++idx){
+		checkstr += buf[idx];
 		res.se += buf[idx];
 	}
-	res.se += buf[idx];
+	checkstr += buf[idx];
 	++idx;
 	unsigned int check = 0;
 	while(buf[idx] != 0){
@@ -243,8 +245,8 @@ pair<int, string> convbuf(char* buf){
 	unsigned char t[MAXLEN << 1]; //for checksum
 	memset(t,0,sizeof t);
 	printf("HAHAHAHA");
-	for(int i = 0;i < res.se.length(); ++i){
-		t[i] = (Byte)res.se[i];
+	for(int i = 0;i < checkstr.length(); ++i){
+		t[i] = (Byte)checkstr[i];
 		printf(" %d", t[i]);
 	}
 	puts("");
@@ -268,7 +270,7 @@ string convRESPtostr(int res, int msgno){
 	s += (char)R.res;
 	s += (char)R.msgno;
 	s += to_string(R.checksum);
-	strcpy(sendbuf, s.c_str());
+	strncpy(sendbuf, s.c_str(), s.length());
 }
 
 void *childProcess(void *threadid){
@@ -279,15 +281,16 @@ void *childProcess(void *threadid){
 		now = q_get(rxq);
 
 		if(now != NULL){
-			printf("Mengkonsumsi byte ke-%d.\n", ++byte_now);
+			printf("Mengkonsumsi byte ke-%d.\n", *now);
 			sendACK(*now);
 			usleep(DELAY * 1000);
+			*now = 0xFF;
 		}
 		else{
 			// printf("ANAK PIPIN :3\n");
 			if(rxq->count != 0){
 				sendNAK(rxq->front);
-				sleep(2);
+				usleep(100000);
 			}
 		}
 	}
