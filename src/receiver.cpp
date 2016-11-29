@@ -227,7 +227,6 @@ void createSocket(char* addr, char* port) {
 
 pair<int, string> convbuf(char* buf){
 	pair<int,string> res = make_pair(-1,"");
-	printf("STX dari transmitter : %u\n", buf[2]);
 	if(buf[0] != SOH) return res;
 	if(buf[2] != STX) return res;
 	res.fi = buf[1];
@@ -302,7 +301,6 @@ void *childProcess(void *threadid){
 				sendNAK(rxq->front);
 				printf("before usleep\n");
 				sleep(2);
-				// usleep(100000000);
 			}
 		}
 	}
