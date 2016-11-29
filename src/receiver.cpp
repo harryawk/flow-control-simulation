@@ -131,6 +131,10 @@ static int rcvframe(int sockfd, QTYPE *q){
 	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
 	}
+	for(int i = 0; recvbuf[i] != ETX; ++i){
+		printf("%d ", recvbuf[i]);
+	}
+	puts("");
 	pair<int,string> M = convbuf(recvbuf);
 	printf("M.first dari convbuf(recvbuf): %d\n", M.first);
 	if(M.se != ""){ // dia ga error
@@ -284,6 +288,12 @@ void *childProcess(void *threadid){
 
 void sendACK(int framenum){
 	string s = convRESPtostr(ACK, framenum);
+
+	memset(sendbuf, 0, sizeof sendbuf);
+	for(int i = 0;i < s.length(); ++i){
+		sendbuf[i] = s[i];
+	}
+	//kayaknya ini masih ngebug
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){//error sending ACK character
 		printf("Error send ACK: %d", send_ack);
@@ -291,6 +301,11 @@ void sendACK(int framenum){
 }
 void sendNAK(int framenum){
 	string s = convRESPtostr(NAK, framenum);
+	//kayaknya ini masih ngebug
+	memset(sendbuf, 0, sizeof sendbuf);
+	for(int i = 0;i < s.length(); ++i){
+		sendbuf[i] = s[i];
+	}
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){//error sending ACK character
 		printf("Error send NAK: %d", send_ack);

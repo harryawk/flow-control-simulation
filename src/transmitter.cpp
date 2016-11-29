@@ -35,7 +35,7 @@ bool done = false;
 
 //sliding window protocol
 char cc[RXQSIZE][MAXLEN + 10]; //size of buffer in chunks
-Byte lastacked = RXQSIZE - 1, lastsent = 0, countBuf = 0;
+Byte lastacked = RXQSIZE - 1, lastsent = -1, countBuf = 0;
 
 bool corruptACK(char* s);
 void createSocket(char* addr, char* port);
@@ -82,16 +82,18 @@ int main(int argc, char *argv[]){
 			printf("\nmesg.etx : %d ----\n", mesg.etx);
 			mesg.msgno = idx % RXQSIZE;
 			printf("\nmesg.msgno : %d ----\n", mesg.msgno);
-			mesg.data = (Byte*)cc[idx % RXQSIZE];
-			printf("\nmesg.data : %s ----\n", (char*)mesg.data);
+			mesg.data = cc[idx % RXQSIZE];
+			printf("\nmesg.data : %s ----\n", mesg.data);
 			string s = convMESGBtostr(mesg);
 
 			memset(c_sendto, 0, sizeof c_sendto);
-			strcpy(c_sendto, s.c_str());
+			for(int i = 0;i < s.length();++i){
+				c_sendto[i] = s[i];
+			}
 
 			printf("Mengirim frame ke-%d: \'%s\' \n", idx, cc[lastsent]);
 			idx++;
-			sendto(sockfd, &c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
+			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
 			usleep(5000);
 		}
 		else if(xoff && NAKnum == -1){ // XOFF sent, receive buffer is above minimum upperlimit
@@ -100,13 +102,16 @@ int main(int argc, char *argv[]){
 		}
 		else{ //NAKnum != -1
 			mesg.msgno = NAKnum;
-			mesg.data = (Byte*)cc[NAKnum % RXQSIZE];
+			mesg.data = cc[NAKnum % RXQSIZE];
 			string s = convMESGBtostr(mesg);
 
 			memset(c_sendto, 0, sizeof c_sendto);
-			strcpy(c_sendto, s.c_str());
+			for(int i = 0;i < s.length();++i){
+				c_sendto[i] = s[i];
+			}
+
 			// printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
-			sendto(sockfd, &c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
+			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
 			usleep(5000);
 			NAKnum = -1;
 		}
@@ -213,13 +218,12 @@ string convMESGBtostr(MESGB m){
 	ret += m.soh;
 	ret += m.msgno;
 	ret += m.stx;
-	ret += (char*)m.data;
+	ret += m.data;
 	ret += m.etx;
-
 	unsigned char t[MAXLEN << 1]; //for checksum
 	strcpy( (char*) t, ret.c_str());
 	m.checksum = crc32a(t);
 	ret += to_string(m.checksum);
-	printf("%u\n", m.checksum);
+	printf("Checksum: %u\n", m.checksum);
 	return ret;
 }

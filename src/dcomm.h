@@ -43,7 +43,7 @@ typedef struct MESGB
 	unsigned char soh;
 	Byte msgno;
 	unsigned char stx;
-	Byte *data;
+	char *data;
 	unsigned char etx;
 	unsigned int checksum;
 } MESGB;
