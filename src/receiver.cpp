@@ -146,10 +146,12 @@ static int rcvframe(QTYPE *q){
 			if(M.fi >= q->front){
 				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 				q->data[M.fi] = M.fi;
+				puts("1.1 MASUK");
 			}
 			else if(q->front > q->rear){
 				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 				q->data[M.fi] = M.fi;
+				puts("1.2 MASUK");
 			}
 			else{
 				//bagi dua lagi, apakah ada didalem batas apa nggak, ini ditulis soalnya bisa aja dia sebenernya lanjutannya tapi udah muter
@@ -159,8 +161,10 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
+					puts("1.3.1 MASUK");
 				}
 				else {
+					puts("1.3.2 GA MASUK");
 					//do nothing!
 				}
 			}
@@ -174,6 +178,10 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
+					puts("2.1.1 MASUK");
+				}
+				else{
+					puts("2.1.2 GA MASUK");
 				}
 			}
 			else{
@@ -184,6 +192,10 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
+					puts("2.2.1 MASUK");
+				}
+				else{
+					puts("2.2.2 GAMASUK");
 				}
 			}
 		}
@@ -304,6 +316,7 @@ void sendACK(int framenum){
 		sendbuf[i] = s[i];
 	}
 	//kayaknya ini masih ngebug
+	printf("sendACK %d\n", framenum);
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){//error sending ACK character
 		printf("Error send ACK: %d", send_ack);
@@ -316,6 +329,7 @@ void sendNAK(int framenum){
 	for(int i = 0;i < s.length(); ++i){
 		sendbuf[i] = s[i];
 	}
+	printf("sendNAK %d\n", framenum);
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){//error sending ACK character
 		printf("Error send NAK: %d", send_ack);

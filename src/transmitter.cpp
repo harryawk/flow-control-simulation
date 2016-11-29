@@ -76,6 +76,8 @@ int main(int argc, char *argv[]){
 			lastsent = (lastsent + 1) % RXQSIZE;
 			countBuf = (lastsent - lastacked);
 			countBuf %= RXQSIZE;
+			if(countBuf < 0) countBuf += RXQSIZE;
+
 			mesg.msgno = idx % RXQSIZE;
 			mesg.data = cc[idx % RXQSIZE];
 			string s = convMESGBtostr(mesg);
@@ -95,6 +97,7 @@ int main(int argc, char *argv[]){
 			usleep(50000);
 		}
 		else{ //NAKnum != -1
+			if(NAKnum == -1) NAKnum = (lastacked + 1) % NAKnum;
 			mesg.msgno = NAKnum;
 			mesg.data = cc[NAKnum % RXQSIZE];
 			string s = convMESGBtostr(mesg);
@@ -104,7 +107,7 @@ int main(int argc, char *argv[]){
 				c_sendto[i] = s[i];
 			}
 
-			// printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
+			printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
 			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
 			usleep(50000);
 			NAKnum = -1;
@@ -208,6 +211,9 @@ void *childProcess(void *threadid){
 					NAKnum = c_recvfrom[1];
 					printf("NAK %d\n", NAKnum);
 				}
+			}
+			else{
+				puts("CORRUPT!!!!");
 			}
 		}
 	}
