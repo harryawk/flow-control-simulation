@@ -52,7 +52,7 @@ void createSocket(char* addr, char* port);
 
 /* Functions declaration */
 static Byte* q_get(QTYPE *);
-static int rcvframe(int sockfd, QTYPE *q);
+static int rcvframe(QTYPE *q);
 pair<int, string> convbuf(char* c);
 string convRESPtostr(int res, int msgno);
 
@@ -63,7 +63,7 @@ socklen_t addrlen = sizeof(serv_addr), clilen = sizeof(cli_addr);
 void *childProcess(void *threadid);
 void sendACK(int framenum);
 void sendNAK(int framenum);
-
+void initRXQ(QTYPE*);
 // SERVER PROGRAM
 int main(int argc, char *argv[]){
 	// create socket
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]){
 	/* Initialize XON/XOFF flags */
 	send_xon = true;
 	send_xoff = false;
-
+	initRXQ(rxq);
 	/* Create child process */
 	pthread_t child_thread;
 	int rc = pthread_create(&child_thread, NULL, childProcess, (void *)0);
@@ -83,16 +83,13 @@ int main(int argc, char *argv[]){
 
 	/*** IF PARENT PROCESS ***/
 	while(true){
-		printf("parent thread\n");
-		int ret = rcvframe(sockfd, rxq);
-		printf("selesai parent\n");
+		int ret = rcvframe(rxq);
 	}
 
 	pthread_join(child_thread, NULL);
 	pthread_exit(NULL);
 	return 0;
 }
-
 /* function for reading character and put it to the receive buffer*/
 
 /* q_get returns a pointer to the buffer where data is read
@@ -100,6 +97,8 @@ int main(int argc, char *argv[]){
  */
 static Byte* q_get(QTYPE *q){
 	Byte* current;
+	puts("MASUK QGET");
+	printf("%d\n", q->count);
 	/* Nothing in the queue */
 	if(!q->count) return (NULL);
 	if(q->data[q->front] == 0xFF) return (NULL);
@@ -127,21 +126,16 @@ static Byte* q_get(QTYPE *q){
 	return current;
 }
 
-static int rcvframe(int sockfd, QTYPE *q){
+static int rcvframe(QTYPE *q){
 	memset(recvbuf, 0, sizeof recvbuf);
-	printf("masuk recvframe\n");
 	int byte_recv = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&cli_addr, &clilen);
-	// printf("%d\n", byte_recv);
 	if(byte_recv < 0){ //error receiving character
 		printf("Error receiving: %d", byte_recv);
+		return -1;
 	}
-	for(int i = 0; recvbuf[i] != ETX; ++i){
-		printf("%d ", recvbuf[i]);
-	}
-	puts("");
 	pair<int,string> M = convbuf(recvbuf);
 	printf("M.first dari convbuf(recvbuf): %d\n", M.first);
-	if(M.se != ""){ // dia ga error
+	if(M.se != "" && M.fi != -1 && q->data[M.fi] == 0xFF){ // dia ga error
 		printf("Menerima frame ke-%d: %s\n", M.fi, M.se.c_str());
 		// receive buffer above minimum upperlimit
 		// sending XOFF
@@ -151,9 +145,11 @@ static int rcvframe(int sockfd, QTYPE *q){
 		if(M.fi <= q->rear){
 			if(M.fi >= q->front){
 				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
+				q->data[M.fi] = M.fi;
 			}
 			else if(q->front > q->rear){
 				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
+				q->data[M.fi] = M.fi;
 			}
 			else{
 				//bagi dua lagi, apakah ada didalem batas apa nggak, ini ditulis soalnya bisa aja dia sebenernya lanjutannya tapi udah muter
@@ -161,6 +157,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
+					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
 				}
 				else {
@@ -175,6 +172,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 					q->count = M.fi + 1 + RXQSIZE - q->front;
 					q->rear = M.fi;
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
+					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
 				}
 			}
@@ -184,6 +182,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 					q->count = M.fi - q->front + 1;
 					q->rear = M.fi;
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
+					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
 				}
 			}
@@ -199,9 +198,7 @@ static int rcvframe(int sockfd, QTYPE *q){
 		}
 	}
 	else{
-		printf("di recvframe\n");
 		sendNAK(q->front);
-		printf("di recvframe\n");
 	}
 	return M.fi;
 }
@@ -249,15 +246,11 @@ pair<int, string> convbuf(char* buf){
 	}
 	unsigned char t[MAXLEN << 1]; //for checksum
 	memset(t,0,sizeof t);
-	printf("HAHAHAHA");
 	for(int i = 0;i < checkstr.length(); ++i){
 		t[i] = (Byte)checkstr[i];
-		printf(" %d", t[i]);
 	}
-	puts("");
+
 	unsigned int checksum = crc32a(t);
-	//////////debug checksum. status : belum lewat///////////////////////
-	printf("%u %u\n", checksum, check);
 	if(checksum != check) return make_pair(-1, "");
 	return res;
 }
@@ -266,16 +259,17 @@ string convRESPtostr(int res, int msgno){
 	RESP R;
 	R.res = res;
 	R.msgno = msgno;
-	unsigned char* uc = new unsigned char[3];
+	unsigned char uc[3];
+	memset(uc, 0, sizeof uc);
 	uc[0] = R.res;
 	uc[1] = R.msgno;
 	R.checksum = crc32a(uc);
-	memset(sendbuf, 0, sizeof sendbuf);
 	string s = "";
 	s += (char)R.res;
 	s += (char)R.msgno;
 	s += to_string(R.checksum);
-	strncpy(sendbuf, s.c_str(), s.length());
+	return s;
+
 }
 
 void *childProcess(void *threadid){
@@ -287,22 +281,17 @@ void *childProcess(void *threadid){
 
 		if(now != NULL){
 			printf("Mengkonsumsi byte ke-%d.\n", *now);
-			printf("numframe : %d\n", *now);
 			sendACK(*now);
-			printf("ack sent!\n");
-			sleep(2);
 			// usleep(DELAY * 10000000);
 			*now = 0xFF;
 		}
 		else{
 			// printf("ANAK PIPIN :3\n");
 			if(rxq->count != 0){
-				printf("di child\n");
 				sendNAK(rxq->front);
-				printf("before usleep\n");
-				sleep(2);
 			}
 		}
+		sleep(1);
 	}
 	pthread_exit(NULL);
 }
@@ -310,12 +299,10 @@ void *childProcess(void *threadid){
 void sendACK(int framenum){
 	string s = convRESPtostr(ACK, framenum);
 	memset(sendbuf, 0, sizeof sendbuf);
-	cout << s << endl;
+	puts(s.c_str());
 	for(int i = 0;i < s.length(); ++i){
-		printf("done resp conv : %d\n", s[i]);
 		sendbuf[i] = s[i];
 	}
-	printf("SEND ACK!\n");
 	//kayaknya ini masih ngebug
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){//error sending ACK character
@@ -329,11 +316,13 @@ void sendNAK(int framenum){
 	for(int i = 0;i < s.length(); ++i){
 		sendbuf[i] = s[i];
 	}
-	printf("SEND NAK!\n");
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
-	printf("done send nak\n");
 	if(send_ack < 0){//error sending ACK character
 		printf("Error send NAK: %d", send_ack);
 	}
-	printf("out sendNAk\n");
+}
+void initRXQ(QTYPE *q){
+	for(int i = 0;i < RXQSIZE; ++i){
+		q->data[i] = 0xFF;
+	}
 }
