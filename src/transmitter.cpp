@@ -90,11 +90,11 @@ int main(int argc, char *argv[]){
 			printf("Mengirim frame ke-%d: \'%s\' \n", idx, cc[lastsent]);
 			idx++;
 			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
-			usleep(500000);
+			usleep(100000);
 		}
 		else if(xoff && NAKnum == -1){ // XOFF sent, receive buffer is above minimum upperlimit
 			printf("Menunggu XON...\n");
-			usleep(50000);
+			usleep(200000);
 		}
 		else{ //NAKnum != -1
 			if(NAKnum == -1) NAKnum = (lastacked + 1) % NAKnum;
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]){
 
 			printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
 			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
-			usleep(50000);
+			usleep(200000);
 			NAKnum = -1;
 		}
 	}
