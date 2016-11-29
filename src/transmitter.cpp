@@ -20,7 +20,7 @@ using namespace std;
 //build a socket
 struct sockaddr_in serv_addr, cli_addr;
 socklen_t serv_len = sizeof(serv_addr), cli_len = sizeof(cli_addr);
-char receiverAddress[MAXLEN];
+char receiverAddress[MAXLEN + 40];
 int sockfd;
 int NAKnum = -1;
 
@@ -35,7 +35,7 @@ bool done = false;
 
 //sliding window protocol
 char cc[RXQSIZE][MAXLEN + 10]; //size of buffer in chunks
-Byte lastacked = RXQSIZE - 1, lastsent = -1, countBuf = 0;
+char lastacked = -1, lastsent = -1, countBuf = 0;
 
 bool corruptACK(char* s);
 void createSocket(char* addr, char* port);
@@ -54,7 +54,6 @@ int main(int argc, char *argv[]){
 	}
 	createSocket(argv[1], argv[2]);
 	initMESGB();
-	printf("\nmesg.stx : %d ----\n", mesg.stx);
 	initTimeOut();
 
 	/* Create child process for receiving data*/
@@ -77,15 +76,8 @@ int main(int argc, char *argv[]){
 			lastsent = (lastsent + 1) % RXQSIZE;
 			countBuf = (lastsent - lastacked);
 			countBuf %= RXQSIZE;
-
-			//set dataformat to mesg
-			printf("\nmesg.soh : %d ----\n", mesg.soh);
-			printf("\nmesg.stx : %d ----\n", mesg.stx);
-			printf("\nmesg.etx : %d ----\n", mesg.etx);
 			mesg.msgno = idx % RXQSIZE;
-			printf("\nmesg.msgno : %d ----\n", mesg.msgno);
 			mesg.data = cc[idx % RXQSIZE];
-			printf("\nmesg.data : %s ----\n", mesg.data);
 			string s = convMESGBtostr(mesg);
 
 			memset(c_sendto, 0, sizeof c_sendto);
@@ -96,11 +88,11 @@ int main(int argc, char *argv[]){
 			printf("Mengirim frame ke-%d: \'%s\' \n", idx, cc[lastsent]);
 			idx++;
 			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
-			usleep(5000);
+			usleep(500000);
 		}
 		else if(xoff && NAKnum == -1){ // XOFF sent, receive buffer is above minimum upperlimit
 			printf("Menunggu XON...\n");
-			usleep(20000);
+			usleep(50000);
 		}
 		else{ //NAKnum != -1
 			mesg.msgno = NAKnum;
@@ -114,7 +106,7 @@ int main(int argc, char *argv[]){
 
 			// printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
 			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
-			usleep(5000);
+			usleep(50000);
 			NAKnum = -1;
 		}
 	}
@@ -129,7 +121,8 @@ bool corruptACK(char* s){
 	string ss = "";
 	unsigned int checksum = 0;
 	unsigned int real_c = 0;
-	while(s[i] != 0){
+
+	while(s[i] != 0 || i < 2){
 		if(i == 0){
 			if(s[i] != ACK && s[i] != NAK){
 				return true;
@@ -141,7 +134,7 @@ bool corruptACK(char* s){
 		else if(i == 1){
 			ss += s[i];
 			unsigned char ta[MAXLEN + 40];
-			memset(ta,0,sizeof ta);
+			memset(ta, 0, sizeof ta);
 			for(int j = 0; j < ss.length(); ++j){
 				ta[j] = ss[j];
 			}
@@ -173,8 +166,8 @@ void initMESGB(){
 }
 void initTimeOut(){
 	struct timeval tv;
-	tv.tv_sec = 0;
-	tv.tv_usec = 200000;
+	tv.tv_sec = 3;
+	tv.tv_usec = 000000;
 	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
 		perror("Error");
 	}
@@ -188,6 +181,7 @@ void *childProcess(void *threadid){
 		if(rc < 0){
 			printf("Timeout!\n");
 			NAKnum = (lastacked + 1) % RXQSIZE;
+			printf("NAK Timeout %d\n", NAKnum);
 		}
 		if(c_recvfrom[0] == XON){
 			printf("XON diterima.\n");
@@ -225,10 +219,12 @@ string convMESGBtostr(MESGB m){
 	ret += m.stx;
 	ret += m.data;
 	ret += m.etx;
-	unsigned char t[MAXLEN << 1]; //for checksum
-	strcpy( (char*) t, ret.c_str());
+	unsigned char t[MAXLEN + 40]; //for checksum
+	memset(t,0,sizeof t);
+	for(int i = 0;i < ret.length(); ++i){
+		t[i] = ret[i];
+	}
 	m.checksum = crc32a(t);
 	ret += to_string(m.checksum);
-	printf("Checksum: %u\n", m.checksum);
 	return ret;
 }
