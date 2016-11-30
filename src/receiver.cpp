@@ -135,8 +135,8 @@ static int rcvframe(QTYPE *q){
 		return -1;
 	}
 	pair<int,string> M = convbuf(recvbuf);
-	printf("M.first dari convbuf %d\n", M.first);
-	if(M.fi != -1 && q->data[M.fi] == 0xFF){ // dia ga error
+	printf("M.first dari convbuf %d\n", M.fi);
+	if(M.fi > -1 && q->data[M.fi] == 0xFF){ // dia ga error
 		printf("Menerima frame ke-%d: %s\n", M.fi, M.se.c_str());
 		// receive buffer above minimum upperlimit
 		// sending XOFF
@@ -215,6 +215,9 @@ static int rcvframe(QTYPE *q){
 			sendto(sockfd, &sendxonxoff, 1, 0, (struct sockaddr*)&cli_addr, clilen);
 		}
 	}
+	else if (M.fi > -100){ //masih ada yang dibenerin
+		sendNAK(M.fi * -1 - 1);
+	}
 	else{
 		sendNAK(q->front);
 		NAKOccur = q->front;
@@ -241,8 +244,10 @@ void createSocket(char* addr, char* port) {
 	printf("Binding pada %s:%d\n", clientName, ntohs(serv_addr.sin_port));
 }
 
+
+//masih pake frame number, belum mau coba pake NAKnya
 pair<int, string> convbuf(char* buf){
-	pair<int,string> res = make_pair(-1,"");
+	pair<int,string> res = make_pair(-100,"");
 	if(buf[0] != SOH) return res;
 	if(buf[2] != STX) return res;
 	res.fi = buf[1];
@@ -263,6 +268,8 @@ pair<int, string> convbuf(char* buf){
 		check += buf[idx] - '0';
 		++idx;
 	}
+
+	//prepare for checksum
 	unsigned char t[MAXLEN << 1]; //for checksum
 	memset(t,0,sizeof t);
 	for(int i = 0;i < checkstr.length(); ++i){
@@ -270,39 +277,48 @@ pair<int, string> convbuf(char* buf){
 	}
 
 	unsigned int checksum = crc32a(t);
-	if(checksum != check) return make_pair(-1, "");
+	if(checksum != check) {
+		res.fi *= -1;
+		--res.fi; //untuk mencegah kalo NAKnya di 0
+
+		res.se = "";
+	}
 	return res;
 }
 
+
+//convert ACK / NAK number and frame number to string
 string convRESPtostr(int res, int msgno){
 // Mengkonversi respon yang akan dikirim menjadi string
+
 	RESP R;
 	R.res = res;
 	R.msgno = msgno;
+
 	unsigned char uc[3];
 	memset(uc, 0, sizeof uc);
 	uc[0] = R.res;
 	uc[1] = R.msgno;
 	R.checksum = crc32a(uc);
-	string s = ""; // string yang akan dikirim ke transmitter
-	s += (char)R.res;
-	s += (char)R.msgno;
-	s += to_string(R.checksum);
-	return s;
 
+	string ans = "";
+	ans += (char)R.res;
+	ans += (char)R.msgno;
+	ans += to_string(R.checksum);
+	return ans;
 }
 
+
+//Proses dengan thread yang berbeda dengan main thread
 void *childProcess(void *threadid){
 	int byte_now = 0;
 	while(true){
 		Byte* now;
-		//ini masih harus diubah lagi, melihat dia getnya ga berurutan
 		now = q_get(rxq);
 
 		if(now != NULL){
 			printf("Mengkonsumsi byte ke-%d.\n", *now);
 			sendACK(*now);
-			// usleep(DELAY * 10000000);
 			*now = 0xFF;
 			if (NAKOccur > -1) { // Kirim NAK, tunggu sampai tidak NAK
 				while (rcvframe(rxq) == -1) {
@@ -314,11 +330,11 @@ void *childProcess(void *threadid){
 			}
 		}
 		else{
-			// printf("ANAK PIPIN :3\n");
 			if(rxq->count != 0){
 				sendNAK(rxq->front);
 			}
 		}
+
 		sleep(1);
 	}
 	pthread_exit(NULL);
@@ -347,7 +363,7 @@ void sendNAK(int framenum){
 	}
 	printf("sendNAK %d\n", framenum);
 	int send_nak = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
-	if(send_nak < 0){//error sending ACK character
+	if(send_nak < 0){//error sending NAK character
 		printf("Error send NAK: %d", send_nak);
 	}
 }
