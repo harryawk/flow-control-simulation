@@ -60,6 +60,7 @@ struct sockaddr_in serv_addr, cli_addr;
 socklen_t addrlen = sizeof(serv_addr), clilen = sizeof(cli_addr);
 
 /* Child process, read character from buffer */
+int NAKOccur = -1;
 void *childProcess(void *threadid);
 void sendACK(int framenum);
 void sendNAK(int framenum);
@@ -216,6 +217,7 @@ static int rcvframe(QTYPE *q){
 	}
 	else{
 		sendNAK(q->front);
+		NAKOccur = q->front;
 	}
 	return M.fi;
 }
@@ -273,6 +275,7 @@ pair<int, string> convbuf(char* buf){
 }
 
 string convRESPtostr(int res, int msgno){
+// Mengkonversi respon yang akan dikirim menjadi string
 	RESP R;
 	R.res = res;
 	R.msgno = msgno;
@@ -281,7 +284,7 @@ string convRESPtostr(int res, int msgno){
 	uc[0] = R.res;
 	uc[1] = R.msgno;
 	R.checksum = crc32a(uc);
-	string s = "";
+	string s = ""; // string yang akan dikirim ke transmitter
 	s += (char)R.res;
 	s += (char)R.msgno;
 	s += to_string(R.checksum);
@@ -301,6 +304,14 @@ void *childProcess(void *threadid){
 			sendACK(*now);
 			// usleep(DELAY * 10000000);
 			*now = 0xFF;
+			if (NAKOccur > -1) { // Kirim NAK, tunggu sampai tidak NAK
+				while (rcvframe(rxq) == -1) {
+					sendNAK(NAKOccur);
+				}
+				sendACK(NAKOccur);
+				NAKOccur = -1;
+				*now = 0xFF;
+			}
 		}
 		else{
 			// printf("ANAK PIPIN :3\n");

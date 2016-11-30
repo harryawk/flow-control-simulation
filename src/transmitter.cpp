@@ -73,15 +73,21 @@ int main(int argc, char *argv[]){
 		printf("MASUK %d %d %d\n", xoff, NAKnum, countBuf);
 		if(!feof(myfile) && !xoff && NAKnum == -1 && countBuf < 13){
 			fgets(cc[(lastsent + 1) % RXQSIZE], MAXLEN, myfile); //read MAXLEN character from file
+
+			// last sent frame number
 			lastsent = (lastsent + 1) % RXQSIZE;
+
+			// banyak yang belum terkirim
 			countBuf = (lastsent - lastacked);
 			countBuf %= RXQSIZE;
 			if(countBuf < 0) countBuf += RXQSIZE;
 
+			// frame data
 			mesg.msgno = idx % RXQSIZE;
 			mesg.data = cc[idx % RXQSIZE];
 			string s = convMESGBtostr(mesg);
 
+			// prepare c_sendto buffer to be sent to receiver
 			memset(c_sendto, 0, sizeof c_sendto);
 			for(int i = 0;i < s.length();++i){
 				c_sendto[i] = s[i];
