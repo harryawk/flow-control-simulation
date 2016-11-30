@@ -103,7 +103,7 @@ int main(int argc, char *argv[]){
 			usleep(200000);
 		}
 		else{ // !xoff or NAKnum != -1
-			if(NAKnum == -1) NAKnum = (lastacked + 1) % NAKnum;
+			if(NAKnum == -1) NAKnum = (lastacked + 1) % RXQSIZE;
 			mesg.msgno = NAKnum;
 			mesg.data = cc[NAKnum % RXQSIZE];
 			string s = convMESGBtostr(mesg);
@@ -113,9 +113,9 @@ int main(int argc, char *argv[]){
 				c_sendto[i] = s[i];
 			}
 
-			printf("Mengirim NAK ke-%d: \'%s\' \n", NAKnum, cc[NAKnum]);
+			printf("Mengirim frame dengan no NAK %d: \'%s\' \n", NAKnum, cc[NAKnum]);
 			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
-			usleep(200000);
+			usleep(2000000);
 			NAKnum = -1;
 		}
 	}

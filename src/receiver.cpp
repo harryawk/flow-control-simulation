@@ -215,7 +215,7 @@ static int rcvframe(QTYPE *q){
 			sendto(sockfd, &sendxonxoff, 1, 0, (struct sockaddr*)&cli_addr, clilen);
 		}
 	}
-	else if (M.fi > -100){ //masih ada yang dibenerin
+	else if (M.fi > -100 && M.fi < 0){ //masih ada yang dibenerin
 		sendNAK(M.fi * -1 - 1);
 	}
 	else{
@@ -334,8 +334,7 @@ void *childProcess(void *threadid){
 				sendNAK(rxq->front);
 			}
 		}
-
-		sleep(1);
+		usleep(400000);
 	}
 	pthread_exit(NULL);
 }
