@@ -43,7 +43,7 @@ void initMESGB();
 void initTimeOut();
 string convMESGBtostr(MESGB m);
 
-/* Child process, receiving XON/XOFF signal from receiver*/
+//child process
 void *childProcess(void *threadid);
 
 int main(int argc, char *argv[]){
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]){
 			printf("Menunggu XON...\n");
 			usleep(200000);
 		}
-		else{ //NAKnum != -1
+		else{ // !xoff or NAKnum != -1
 			if(NAKnum == -1) NAKnum = (lastacked + 1) % NAKnum;
 			mesg.msgno = NAKnum;
 			mesg.data = cc[NAKnum % RXQSIZE];
@@ -151,6 +151,7 @@ bool corruptACK(char* s){
 	}
 	return checksum != real_c;
 }
+
 void createSocket(char* addr, char* port){
 	//define a client socket
 	serv_addr.sin_family = AF_INET;
@@ -162,11 +163,15 @@ void createSocket(char* addr, char* port){
 	printf("Membuat socket untuk koneksi ke %s:%d ...\n", receiverAddress, htons(serv_addr.sin_port));
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 }
+
+//initialize SOH, STX, and ETX value of frame with defined value SOH, STX, dan ETX
 void initMESGB(){
 	mesg.soh = SOH;
 	mesg.stx = STX;
 	mesg.etx = ETX;
 }
+
+//initialize timeout value
 void initTimeOut(){
 	struct timeval tv;
 	tv.tv_sec = 3;
@@ -175,6 +180,8 @@ void initTimeOut(){
 		perror("Error");
 	}
 }
+
+//child process, receiving XON/XOFF and ACK/NAK signal from receiver
 void *childProcess(void *threadid){
 
 	int now = 0;
@@ -195,9 +202,8 @@ void *childProcess(void *threadid){
 			xoff = true;
 		}
 		else{
-			if(!corruptACK(c_recvfrom)){
-				//dia nerima ACK / NAK
-				if(c_recvfrom[0] == ACK){
+			if(!corruptACK(c_recvfrom)){ //receive ACK/NAK
+				if(c_recvfrom[0] == ACK){ //receive ACK
 					printf("ACK %d\n", c_recvfrom[1]);
 					lastacked = c_recvfrom[1];
 					if(lastacked <= lastsent){
@@ -207,17 +213,19 @@ void *childProcess(void *threadid){
 						countBuf = lastsent + 1 + (RXQSIZE - 1) - lastacked;
 					}
 				}
-				else{
+				else{ //receive NAK
 					NAKnum = c_recvfrom[1];
 					printf("NAK %d\n", NAKnum);
 				}
 			}
-			else{
+			else{ //data corrupted
 				puts("CORRUPT!!!!");
 			}
 		}
 	}
 }
+
+//convert frame to string and add checksum value
 string convMESGBtostr(MESGB m){
 	string ret = "";
 	ret += m.soh;
