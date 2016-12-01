@@ -32,6 +32,7 @@ using namespace std;
 
 /////////////////////////////////////////////////////////////////
 int msgno = 0;
+bool ENDOFFILE = false;
 /* for sliding window protocol and selective-repeat ARQ */
 Byte rxbuf[RXQSIZE];
 Byte msg[RXQSIZE][MAXLEN + 10];
@@ -65,6 +66,7 @@ void *childProcess(void *threadid);
 void sendACK(int framenum);
 void sendNAK(int framenum);
 void initRXQ(QTYPE*);
+bool isEndFrame(int no_frame);
 // SERVER PROGRAM
 int main(int argc, char *argv[]){
 	// create socket
@@ -106,6 +108,7 @@ static Byte* q_get(QTYPE *q){
 
 	(q->count)--;
 	current = &(q->data[q->front]);
+	ENDOFFILE |= isEndFrame(q->front);
 	q->front++;
 
 	if(q->front == RXQSIZE){
@@ -124,6 +127,7 @@ static Byte* q_get(QTYPE *q){
 			exit(-3);
 		}
 	}
+
 	return current;
 }
 
@@ -320,6 +324,9 @@ void *childProcess(void *threadid){
 			printf("Mengkonsumsi byte ke-%d.\n", *now);
 			sendACK(*now);
 			*now = 0xFF;
+			if(ENDOFFILE){ //file sudah habis
+				exit(0);
+			}
 			if (NAKOccur > -1) { // Kirim NAK, tunggu sampai tidak NAK
 				while (rcvframe(rxq) == -1) {
 					sendNAK(NAKOccur);
@@ -370,4 +377,11 @@ void initRXQ(QTYPE *q){
 	for(int i = 0;i < RXQSIZE; ++i){
 		q->data[i] = 0xFF;
 	}
+}
+
+bool isEndFrame(int no_frame){
+	for(int i = 0; i < msg[no_frame][i] != 0; ++i){
+		if(msg[no_frame][i] == Endfile) return true;
+	}
+	return false;
 }

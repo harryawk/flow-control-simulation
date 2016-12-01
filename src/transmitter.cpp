@@ -44,6 +44,7 @@ void initTimeOut();
 string convMESGBtostr(MESGB m);
 
 //child process
+bool ENDOFFILE = false;
 void *childProcess(void *threadid);
 
 int main(int argc, char *argv[]){
@@ -98,6 +99,35 @@ int main(int argc, char *argv[]){
 			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
 			usleep(100000);
 		}
+		else if(!xoff && NAKnum == -1 && countBuf < 13 && !ENDOFFILE){
+			ENDOFFILE = true;
+			cc[(lastsent + 1) % RXQSIZE][0] = Endfile;
+			cc[(lastsent + 1) % RXQSIZE][1] = '\0';
+
+			// last sent frame number
+			lastsent = (lastsent + 1) % RXQSIZE;
+
+			// banyak yang belum terkirim
+			countBuf = (lastsent - lastacked);
+			countBuf %= RXQSIZE;
+			if(countBuf < 0) countBuf += RXQSIZE;
+
+			// frame data
+			mesg.msgno = idx % RXQSIZE;
+			mesg.data = cc[idx % RXQSIZE];
+			string s = convMESGBtostr(mesg);
+
+			// prepare c_sendto buffer to be sent to receiver
+			memset(c_sendto, 0, sizeof c_sendto);
+			for(int i = 0;i < s.length();++i){
+				c_sendto[i] = s[i];
+			}
+
+			printf("Mengirim END OF FILE frame ke-%d: \'%s\' \n", idx, cc[lastsent]);
+			idx++;
+			sendto(sockfd, c_sendto, sizeof(c_sendto), 0, (struct sockaddr*)&serv_addr, serv_len);
+			usleep(100000);
+		}
 		else if(xoff && NAKnum == -1){ // XOFF sent, receive buffer is above minimum upperlimit
 			printf("Menunggu XON...\n");
 			usleep(200000);
@@ -119,6 +149,7 @@ int main(int argc, char *argv[]){
 			NAKnum = -1;
 		}
 	}
+
 	done = true;
 	// reach end of file
 	fclose(myfile);
