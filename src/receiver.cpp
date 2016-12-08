@@ -110,7 +110,9 @@ static Byte* q_get(QTYPE *q){
 	current = &(q->data[q->front]);
 	ENDOFFILE |= isEndFrame(q->front);
 	q->front++;
-
+	if(!q->count){
+		q->rear = (q->rear + 1)%RXQSIZE;
+	}
 	if(q->front == RXQSIZE){
 		q->front = 0;
 	}
@@ -144,19 +146,20 @@ static int rcvframe(QTYPE *q){
 		printf("Menerima frame ke-%d: %s\n", M.fi, M.se.c_str());
 		// receive buffer above minimum upperlimit
 		// sending XOFF
-
+		printf("BEFORE Qfront : %d, Qrear : %d Qcount : %d\n", q->front, q->rear, q->count);
+		
 		//bagi 2, apakah dia ada di depan lastacked apa dibelakang lastacked.
 		//intinya bagi duanya itu buat mau diabaikan apa diterima
 		if(M.fi <= q->rear){
 			if(M.fi >= q->front){
 				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 				q->data[M.fi] = M.fi;
-				// puts("1.1 MASUK");
+				puts("1.1 MASUK");
 			}
 			else if(q->front > q->rear){
 				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 				q->data[M.fi] = M.fi;
-	//			puts("1.2 MASUK");
+				puts("1.2 MASUK");
 			}
 			else{
 				//bagi dua lagi, apakah ada didalem batas apa nggak, ini ditulis soalnya bisa aja dia sebenernya lanjutannya tapi udah muter
@@ -166,10 +169,10 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
-	//				puts("1.3.1 MASUK");
+					puts("1.3.1 MASUK");
 				}
 				else {
-	//				puts("1.3.2 GA MASUK");
+					puts("1.3.2 GA MASUK");
 					//do nothing!
 				}
 			}
@@ -183,15 +186,15 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
-	//				puts("2.1.1 MASUK");
+					puts("2.1.1 MASUK");
 				}
 				else if (M.fi >= q->front){
 					strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
-	//				puts("2.1.2 MASUK");
+					puts("2.1.2 MASUK");
 				}
 				else{
-	//				puts("2.1.3 GA MASUK");
+					puts("2.1.3 GA MASUK");
 				}
 			}
 			else{
@@ -202,14 +205,14 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
-	//				puts("2.2.1 MASUK");
+					puts("2.2.1 MASUK");
 				}
 				else{
-	//				puts("2.2.2 GAMASUK");
+					puts("2.2.2 GAMASUK");
 				}
 			}
 		}
-
+		printf("AFTER Qfront : %d, Qrear : %d Qcount: %d\n", q->front, q->rear, q->count);
 		if(q->count >= WINDOWSIZE){
 			sendxonxoff = XOFF;
 			send_xoff = true;
@@ -349,7 +352,7 @@ void *childProcess(void *threadid){
 void sendACK(int framenum){
 	string s = convRESPtostr(ACK, framenum);
 	memset(sendbuf, 0, sizeof sendbuf);
-	//puts(s.c_str());
+	puts(s.c_str());
 	for(int i = 0;i < s.length(); ++i){
 		sendbuf[i] = s[i];
 	}
@@ -364,6 +367,7 @@ void sendNAK(int framenum){
 	string s = convRESPtostr(NAK, framenum);
 	//kayaknya ini masih ngebug
 	memset(sendbuf, 0, sizeof sendbuf);
+	puts(s.c_str());
 	for(int i = 0;i < s.length(); ++i){
 		sendbuf[i] = s[i];
 	}
