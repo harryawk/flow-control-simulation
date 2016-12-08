@@ -71,7 +71,7 @@ int main(int argc, char *argv[]){
 
 	/* Parent send data */
 	while (!feof(myfile) || countBuf > 0){
-		printf("MASUK %d %d %d\n", xoff, NAKnum, countBuf);
+		//printf("MASUK %d %d %d\n", xoff, NAKnum, countBuf);
 		if(!feof(myfile) && !xoff && NAKnum == -1 && countBuf < 13){
 			fgets(cc[(lastsent + 1) % RXQSIZE], MAXLEN, myfile); //read MAXLEN character from file
 			if(feof(myfile)) continue;
