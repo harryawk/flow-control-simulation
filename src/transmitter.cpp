@@ -74,7 +74,7 @@ int main(int argc, char *argv[]){
 		printf("MASUK %d %d %d\n", xoff, NAKnum, countBuf);
 		if(!feof(myfile) && !xoff && NAKnum == -1 && countBuf < 13){
 			fgets(cc[(lastsent + 1) % RXQSIZE], MAXLEN, myfile); //read MAXLEN character from file
-
+			if(feof(myfile)) continue;
 			// last sent frame number
 			lastsent = (lastsent + 1) % RXQSIZE;
 
