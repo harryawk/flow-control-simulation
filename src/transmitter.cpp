@@ -275,7 +275,12 @@ string convMESGBtostr(MESGB m){
 	for(int i = 0;i < ret.length(); ++i){
 		t[i] = ret[i];
 	}
-	m.checksum = crc32a(t);
+	if(rand() & 7){
+		m.checksum = crc32a(t);
+	}
+	else{
+		m.checksum = 0;
+	}
 	ret += to_string(m.checksum);
 	return ret;
 }
