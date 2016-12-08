@@ -36,7 +36,7 @@ bool ENDOFFILE = false;
 /* for sliding window protocol and selective-repeat ARQ */
 Byte rxbuf[RXQSIZE];
 Byte msg[RXQSIZE][MAXLEN + 10];
-char clientName[MAXLEN];
+char clientName[MAXLEN + 100];
 char recvbuf[MAXLEN + 40], sendbuf[MAXLEN + 40];
 
 QTYPE rcvq = { 0, 0, 0, RXQSIZE, rxbuf };
@@ -100,8 +100,8 @@ int main(int argc, char *argv[]){
  */
 static Byte* q_get(QTYPE *q){
 	Byte* current;
-	puts("MASUK QGET");
-	printf("%d\n", q->count);
+	//puts("MASUK QGET");
+	printf("Sisa Count: %d\n", q->count);
 	/* Nothing in the queue */
 	if(!q->count) return (NULL);
 	if(q->data[q->front] == 0xFF) return (NULL);
@@ -135,11 +135,11 @@ static int rcvframe(QTYPE *q){
 	memset(recvbuf, 0, sizeof recvbuf);
 	int byte_recv = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&cli_addr, &clilen);
 	if(byte_recv < 0){ //error receiving character
-		printf("Error receiving: %d", byte_recv);
+		printf("Error receiving: %d\n", byte_recv);
 		return -1;
 	}
 	pair<int,string> M = convbuf(recvbuf);
-	printf("M.first dari convbuf %d\n", M.fi);
+	//printf("M.first dari convbuf %d\n", M.fi);
 	if(M.fi > -1 && q->data[M.fi] == 0xFF){ // dia ga error
 		printf("Menerima frame ke-%d: %s\n", M.fi, M.se.c_str());
 		// receive buffer above minimum upperlimit
@@ -151,12 +151,12 @@ static int rcvframe(QTYPE *q){
 			if(M.fi >= q->front){
 				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 				q->data[M.fi] = M.fi;
-				puts("1.1 MASUK");
+				// puts("1.1 MASUK");
 			}
 			else if(q->front > q->rear){
 				strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 				q->data[M.fi] = M.fi;
-				puts("1.2 MASUK");
+	//			puts("1.2 MASUK");
 			}
 			else{
 				//bagi dua lagi, apakah ada didalem batas apa nggak, ini ditulis soalnya bisa aja dia sebenernya lanjutannya tapi udah muter
@@ -166,10 +166,10 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
-					puts("1.3.1 MASUK");
+	//				puts("1.3.1 MASUK");
 				}
 				else {
-					puts("1.3.2 GA MASUK");
+	//				puts("1.3.2 GA MASUK");
 					//do nothing!
 				}
 			}
@@ -183,15 +183,15 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
-					puts("2.1.1 MASUK");
+	//				puts("2.1.1 MASUK");
 				}
 				else if (M.fi >= q->front){
 					strncpy((char*)msg[M.fi], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
-					puts("2.1.2 MASUK");
+	//				puts("2.1.2 MASUK");
 				}
 				else{
-					puts("2.1.3 GA MASUK");
+	//				puts("2.1.3 GA MASUK");
 				}
 			}
 			else{
@@ -202,10 +202,10 @@ static int rcvframe(QTYPE *q){
 					strncpy((char*)msg[q->rear], M.se.c_str(), M.se.length());
 					q->data[M.fi] = M.fi;
 					lastrecv = q->rear;
-					puts("2.2.1 MASUK");
+	//				puts("2.2.1 MASUK");
 				}
 				else{
-					puts("2.2.2 GAMASUK");
+	//				puts("2.2.2 GAMASUK");
 				}
 			}
 		}
@@ -238,7 +238,7 @@ void createSocket(char* addr, char* port) {
    	serv_addr.sin_port = htons(atoi(port));
 
 	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) { //binding error
-   		perror("ERROR : on binding");
+   		perror("ERROR : on binding\n");
    		exit(1);
    	}
    	// printf("%s\n", serv_addr.sin_addr.s_addr);
@@ -349,7 +349,7 @@ void *childProcess(void *threadid){
 void sendACK(int framenum){
 	string s = convRESPtostr(ACK, framenum);
 	memset(sendbuf, 0, sizeof sendbuf);
-	puts(s.c_str());
+	//puts(s.c_str());
 	for(int i = 0;i < s.length(); ++i){
 		sendbuf[i] = s[i];
 	}
@@ -357,7 +357,7 @@ void sendACK(int framenum){
 	printf("sendACK %d\n", framenum);
 	int send_ack = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_ack < 0){//error sending ACK character
-		printf("Error send ACK: %d", send_ack);
+		printf("Error send ACK: %d\n", send_ack);
 	}
 }
 void sendNAK(int framenum){
@@ -370,7 +370,7 @@ void sendNAK(int framenum){
 	printf("sendNAK %d\n", framenum);
 	int send_nak = sendto(sockfd, sendbuf, sizeof(sendbuf), 0, (struct sockaddr*)&cli_addr, clilen);
 	if(send_nak < 0){//error sending NAK character
-		printf("Error send NAK: %d", send_nak);
+		printf("Error send NAK: %d\n", send_nak);
 	}
 }
 void initRXQ(QTYPE *q){
