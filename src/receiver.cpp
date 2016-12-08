@@ -349,7 +349,6 @@ void *childProcess(void *threadid){
 void sendACK(int framenum){
 	string s = convRESPtostr(ACK, framenum);
 	memset(sendbuf, 0, sizeof sendbuf);
-	puts(s.c_str());
 	for(int i = 0;i < s.length(); ++i){
 		sendbuf[i] = s[i];
 	}
